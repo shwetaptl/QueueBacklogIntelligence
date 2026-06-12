@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+
+  backend:
+    volumes:
+      - ./backend:/home/site/wwwroot    ← live code reloading
+      - ./logs:/var/log                 ← read logs in VS Code
+    environment:
+      - AZURE_FUNCTIONS_ENVIRONMENT=Development
+
+  frontend:
+    volumes:
+      - ./frontend/src:/app/src         ← live React code reloading

@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+
+  # ── Azure Functions Backend ──────────────────────────
+  backend:
+    platform: linux/amd64
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qbi-backend
+    ports:
+      - "7071:80"
+    networks:
+      - qbi-network
+    env_file:
+      - .env
+    volumes:
+      - backend-logs:/var/log
+    restart: unless-stopped
+
+  # ── React Frontend ───────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: qbi-frontend
+    ports:
+      - "3000:80"
+    networks:
+      - qbi-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+# ── Networks ─────────────────────────────────────────
+networks:
+  qbi-network:
+    driver: bridge
+
+# ── Volumes ──────────────────────────────────────────
+volumes:
+  backend-logs:

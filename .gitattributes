@@ -1,0 +1,3 @@
+frontend/src/**/*.jsx linguist-language=JavaScript
+frontend/src/**/*.js linguist-language=JavaScript
+frontend/src/**/*.css linguist-language=CSS
