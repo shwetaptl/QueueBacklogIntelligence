@@ -104,7 +104,7 @@ QueueBacklogIntelligence/
 │   │   ├── CollectorFunction.cs         # Timer :00 — collects raw metrics
 │   │   ├── AnalyzerFunction.cs          # Timer :30 — runs intelligence pipeline
 │   │   ├── AlertDispatcherFunction.cs   # Timer :45 — sends Teams alerts
-│   │   └── DashboardFunction.cs         # HTTP — 6 REST endpoints
+│   │   └── DashboardFunction.cs         # HTTP — 10 endpoints
 │   ├── Services/
 │   │   ├── CollectorService.cs
 │   │   ├── AnalyzerService.cs           # 9-step intelligence pipeline

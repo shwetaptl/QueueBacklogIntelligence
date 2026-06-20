@@ -729,6 +729,13 @@ cd frontend && npm run dev   # port 5173
 ### Frontend environment
 `VITE_API_URL` environment variable — if not set, defaults to `http://localhost:7071/api`.
 
+### First-run verification
+Before starting the pipeline for the first time, confirm the `TeamsWebhookUrl` value is correct
+for each row in the `QueueConfig` Azure Table Storage table. An incorrect URL causes
+`AlertDispatcherFunction` to fail silently — Teams notifications are never sent, and the only
+log entry (`"Alert processing failed. Alert failure will not block next run."`) does not
+identify the WebhookUrl as the cause. The pipeline itself continues running normally.
+
 ---
 
 ## 16. Known Issues / Future Work
@@ -738,3 +745,9 @@ cd frontend && npm run dev   # port 5173
 - `StatusCard.jsx` exists in the repo but is not used — replaced by `StatusRow.jsx`
 - No automated tests — all testing is manual injection scenarios
 - Single environment — no staging/dev separation from production Azure resources
+- **Monitor/Admin API delta mismatch → `SlaStatus=UNKNOWN` is expected behavior, not a bug.**
+  When Azure Monitor's implied delta (`IncomingPerMin − OutgoingPerMin`) disagrees with the
+  Service Bus Admin API's actual active-count delta by more than the `ConsistencyTolerance`
+  (5.0), `AnalyzerFunction` falls back to the Admin API delta and reports `SlaStatus=UNKNOWN`
+  for that cycle instead of firing a potentially-false Critical alert. No alert is dispatched
+  for an UNKNOWN cycle. See Step 4 in §6.
