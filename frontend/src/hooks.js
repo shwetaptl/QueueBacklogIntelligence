@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useAuthFetch } from './auth/useAuthFetch'
 
 export function useInterval(callback, delay) {
   const ref = useRef(callback)
@@ -16,9 +17,12 @@ export function useFetch(url, intervalMs) {
   const [error,     setError]     = useState(null)
   const [fetchedAt, setFetchedAt] = useState(null)
 
+  const { getAuthHeaders } = useAuthFetch()
+
   const load = useCallback(async () => {
     try {
-      const res = await fetch(url)
+      const headers = await getAuthHeaders()
+      const res = await fetch(url, { headers })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setData(await res.json())
       setError(null)
@@ -28,7 +32,7 @@ export function useFetch(url, intervalMs) {
     } finally {
       setLoading(false)
     }
-  }, [url])
+  }, [url, getAuthHeaders])
 
   // When the URL changes (e.g. user picked a different time range), clear stale
   // data immediately and show the loading skeleton rather than keeping old data.
