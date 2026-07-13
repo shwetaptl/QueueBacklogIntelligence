@@ -32,6 +32,18 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# ── Results directory (one folder per run) ───────────────────────────────────
+RUN_TS=$(date +%Y%m%d_%H%M%S)
+RESULTS_DIR="./TestResults/${RUN_TS}"
+mkdir -p "$RESULTS_DIR"
+LOG_FILE="$RESULTS_DIR/terminal.log"
+
+# Tee all stdout to the log file while keeping the terminal interactive
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+echo -e "${CYAN}Results will be saved to: ${BOLD}$RESULTS_DIR${NC}"
+echo ""
+
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
 queue_count() {
@@ -146,6 +158,50 @@ for r in rows:
     echo ""
 }
 
+# verify_not_consumer_stopped: asserts RootCause != ConsumerStopped and TrendLabel != Stable/Idle
+# Used by TC-09 where we can't use verify_scenario (which only checks equality, not inequality)
+verify_not_consumer_stopped() {
+    local scenario=$1
+    echo ""
+    echo -e "${BOLD}─── VERIFICATION: $scenario ───${NC}"
+    echo -e "Expected: RootCause ${RED}≠ ConsumerStopped${NC}, TrendLabel ${RED}≠ ConsumerStopped trend${NC}"
+
+    local result=$(az storage entity query \
+      --account-name "$STORAGE_ACCOUNT" \
+      --table-name QueueStatus \
+      --filter "PartitionKey eq '$QUEUE'" \
+      --num-results 1 \
+      --connection-string "$STORAGE_CONN" \
+      --output json 2>/dev/null | python3 -c "
+import json, sys
+rows = json.load(sys.stdin).get('items', [])
+if rows:
+    r = rows[0]
+    active = r.get('ActiveCount', {})
+    active = active.get('value', active) if isinstance(active, dict) else active
+    print('{}|{}|{}|{}|{}'.format(
+        r.get('TrendLabel','?'),
+        r.get('SlaStatus','?'),
+        r.get('AlertSeverity','?'),
+        r.get('RootCause','?'),
+        active))
+")
+    local actual_trend=$(echo "$result" | cut -d'|' -f1)
+    local actual_sla=$(echo "$result"   | cut -d'|' -f2)
+    local actual_sev=$(echo "$result"   | cut -d'|' -f3)
+    local actual_cause=$(echo "$result" | cut -d'|' -f4)
+    local actual_active=$(echo "$result"| cut -d'|' -f5)
+
+    echo -e "Actual:   Trend=${YELLOW}$actual_trend${NC} SLA=${YELLOW}$actual_sla${NC} Severity=${YELLOW}$actual_sev${NC} Cause=${YELLOW}$actual_cause${NC} (Active=$actual_active)"
+
+    if [ "$actual_cause" = "ConsumerStopped" ]; then
+        echo -e "${RED}${BOLD}❌ FAIL — RootCause is ConsumerStopped (false positive! burst arrival mistaken for consumer crash)${NC}"
+    else
+        echo -e "${GREEN}${BOLD}✅ PASS — RootCause is '$actual_cause' (not ConsumerStopped)${NC}"
+    fi
+    echo ""
+}
+
 verify_scenario() {
     local scenario=$1
     local expected_trend=$2
@@ -202,6 +258,45 @@ PYEOF2
 }
 
 
+# ── Save Azure Table snapshots to JSON files ─────────────────────────────────
+# Usage: save_snapshot TC02 "after_incident"
+save_snapshot() {
+    local tc=$1        # e.g. TC02
+    local label=$2     # e.g. after_incident
+    local ts
+    ts=$(date +%H%M%S)
+    local prefix="${RESULTS_DIR}/${tc}_${ts}_${label}"
+
+    echo -e "${CYAN}  → Saving table data: ${prefix}_*.json${NC}"
+
+    az storage entity query \
+      --account-name "$STORAGE_ACCOUNT" \
+      --table-name QueueSnapshot \
+      --filter "PartitionKey eq '$QUEUE'" \
+      --num-results 20 \
+      --connection-string "$STORAGE_CONN" \
+      --output json > "${prefix}_snapshots.json" 2>/dev/null
+
+    az storage entity query \
+      --account-name "$STORAGE_ACCOUNT" \
+      --table-name QueueStatus \
+      --filter "PartitionKey eq '$QUEUE'" \
+      --num-results 20 \
+      --connection-string "$STORAGE_CONN" \
+      --output json > "${prefix}_status.json" 2>/dev/null
+
+    az storage entity query \
+      --account-name "$STORAGE_ACCOUNT" \
+      --table-name AlertRecord \
+      --filter "PartitionKey eq '$QUEUE'" \
+      --num-results 10 \
+      --connection-string "$STORAGE_CONN" \
+      --output json > "${prefix}_alerts.json" 2>/dev/null
+
+    echo -e "${GREEN}  → Saved: $(basename "${prefix}")_*.json${NC}"
+}
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # SCENARIOS
 # ═══════════════════════════════════════════════════════════════════════════
@@ -216,7 +311,7 @@ scenario_1_empty_baseline() {
     echo -e "Verifies: No false alarms on empty queue"
     echo ""
     purge_queue
-    wait_and_check 150 "letting 2 analyzer cycles run"
+    wait_and_check 180 "letting 3 analyzer cycles run"
     check_data 5
 
     cat > /tmp/qbis_check_tc01.py << PYEOF2
@@ -231,7 +326,7 @@ for r in rows:
         sev = r.get("AlertSeverity","")
         cause = r.get("RootCause","")
         trend = r.get("TrendLabel","")
-        if sla == "OK" and cause in ["Healthy","Unknown"] and trend in ["Idle","Stable","Unknown"]:
+        if sla == "OK" and sev == "None" and cause in ["Healthy"] and trend in ["Idle","Stable"]:
             print("PASS:" + trend)
         else:
             print("FAIL:sla=" + sla + " sev=" + sev + " cause=" + cause + " trend=" + trend)
@@ -242,7 +337,7 @@ PYEOF2
 
     echo ""
     echo -e "${BOLD}─── VERIFICATION: TC-01 Empty Baseline ───${NC}"
-    echo -e "Expected: Empty queue shows OK, None, Healthy/Idle"
+    echo -e "Expected: Empty queue shows Idle/Stable, OK, None, Healthy (Unknown = FAIL)"
     RESULT=$(az storage entity query       --account-name "$STORAGE_ACCOUNT"       --table-name QueueStatus       --filter "PartitionKey eq '$QUEUE'"       --num-results 5       --connection-string "$STORAGE_CONN"       --output json 2>/dev/null | python3 /tmp/qbis_check_tc01.py)
 
     if [[ "$RESULT" == PASS* ]]; then
@@ -252,6 +347,7 @@ PYEOF2
         echo -e "${RED}${BOLD}❌ FAIL — $RESULT${NC}"
     fi
     echo ""
+    save_snapshot "TC01" "verify"
     read -p "Press ENTER to continue to next scenario..."
 }
 
@@ -293,6 +389,7 @@ PYEOF2
         echo -e "\033[0;31m\033[1m❌ FAIL — ConsumerStopped not found in recent history\033[0m"
     fi
     echo ""
+    save_snapshot "TC02" "verify"
     read -p "Press ENTER to continue..."
 }
 
@@ -350,6 +447,7 @@ PYEOF2
         echo -e "${RED}${BOLD}❌ FAIL — $RESULT${NC}"
     fi
     echo ""
+    save_snapshot "TC03" "verify"
     read -p "Press ENTER to continue..."
 }
 
@@ -379,6 +477,129 @@ scenario_4_stable_balanced() {
     wait_and_check 120 "letting analyzer see stable state"
     check_data 8
     verify_scenario "TC-04 Stable Balanced" "ANY" "OK" "None" "ANY"
+    save_snapshot "TC04" "verify"
+    read -p "Press ENTER to continue..."
+}
+
+scenario_5_consumer_stops_mid_op() {
+    echo ""
+    echo -e "${BOLD}${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}${RED} TC-05: CONSUMER STOPS MID-OPERATION${NC}"
+    echo -e "${BOLD}${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "What:    Queue running normally (consumer active, messages flowing),"
+    echo -e "         then consumer suddenly stops mid-operation"
+    echo -e "Expect:  RootCause=Healthy/Stable → RootCause=ConsumerStopped"
+    echo -e "Verifies: State transition captured with exact before/after timestamp"
+    echo ""
+
+    # ── Phase 1: Establish healthy flowing queue ───────────────────────────
+    echo -e "${BOLD}PHASE 1: Establish healthy queue state (3 send+consume rounds)${NC}"
+    purge_queue
+
+    for round in 1 2 3; do
+        echo ""
+        echo -e "${CYAN}── Healthy round $round of 3 ──${NC}"
+        send_messages 10 "tc05-healthy-r${round}"
+        echo -e "${YELLOW}→ Consume ALL 10 messages now (keep the consumer active):${NC}"
+        echo -e "${YELLOW}  Portal → $NAMESPACE → $QUEUE → Service Bus Explorer${NC}"
+        echo -e "${YELLOW}  Receive tab → ReceiveAndDelete → Max count: 10 → Receive${NC}"
+        read -p "  Press ENTER when all 10 are consumed..."
+        local cnt
+        cnt=$(queue_count)
+        echo -e "  Queue count after consume: ${BOLD}$cnt messages${NC}"
+        echo -e "${CYAN}  Waiting 70s — letting analyzer write a Healthy row...${NC}"
+        sleep 70
+        check_data 3
+    done
+
+    save_snapshot "TC05" "phase1_healthy_baseline"
+    echo ""
+    echo -e "${GREEN}Phase 1 complete — Healthy baseline established in QueueStatus table.${NC}"
+
+    # ── Phase 2: Stop consumer (inject messages, no one consumes) ─────────
+    echo ""
+    echo -e "${BOLD}PHASE 2: Inject 20 messages — DO NOT consume from here onward${NC}"
+    send_messages 20 "tc05-incident"
+    local STOP_TIME
+    STOP_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    echo ""
+    echo -e "${RED}${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}${BOLD}║  Consumer stopped at: $STOP_TIME          ║${NC}"
+    echo -e "${RED}${BOLD}║  DO NOT consume any messages from here onward            ║${NC}"
+    echo -e "${RED}${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+
+    wait_and_check 180 "waiting for ConsumerStopped detection (3 min)"
+    check_data 10
+    save_snapshot "TC05" "phase2_after_stop"
+
+    # ── Verification: find the exact transition row ────────────────────────
+    echo ""
+    echo -e "${BOLD}─── VERIFICATION: TC-05 Mid-Operation Transition ───${NC}"
+    echo -e "Expected: QueueStatus shows a Healthy row followed by a ConsumerStopped row"
+
+    cat > /tmp/qbis_check_tc05.py << 'PYEOF'
+import json, sys
+
+rows = json.load(sys.stdin).get("items", [])
+# Table Storage returns newest-first — reverse to get oldest-first (chronological)
+rows = list(reversed(rows))
+
+healthy_row = None
+stopped_row = None
+
+for r in rows:
+    cause  = r.get("RootCause", "")
+    ts     = str(r.get("TimestampUtc", "?"))[:19]
+    active_raw = r.get("ActiveCount", {})
+    active = active_raw.get("value", active_raw) if isinstance(active_raw, dict) else active_raw
+    sev    = r.get("AlertSeverity", "")
+    sla    = r.get("SlaStatus", "")
+
+    if cause in ("Healthy", "Stable", "Idle") and healthy_row is None:
+        healthy_row = f"{ts}|Active={active}|Severity={sev}|SLA={sla}|Cause={cause}"
+
+    if cause == "ConsumerStopped" and healthy_row is not None and stopped_row is None:
+        stopped_row = f"{ts}|Active={active}|Severity={sev}|SLA={sla}|Cause={cause}"
+
+if healthy_row and stopped_row:
+    print("PASS")
+    print(f"HEALTHY|{healthy_row}")
+    print(f"STOPPED|{stopped_row}")
+elif healthy_row:
+    print(f"PARTIAL|ConsumerStopped not yet written. Last healthy: {healthy_row.split('|')[0]}. Wait 2 more min.")
+else:
+    print("FAIL|No Healthy/Stable row found in history — run Phase 1 longer")
+PYEOF
+
+    RAW=$(az storage entity query \
+      --account-name "$STORAGE_ACCOUNT" \
+      --table-name QueueStatus \
+      --filter "PartitionKey eq '$QUEUE'" \
+      --num-results 30 \
+      --connection-string "$STORAGE_CONN" \
+      --output json 2>/dev/null | python3 /tmp/qbis_check_tc05.py)
+
+    STATUS=$(echo "$RAW" | head -1)
+
+    if [ "$STATUS" == "PASS" ]; then
+        HEALTHY_LINE=$(echo "$RAW" | grep "^HEALTHY|" | sed 's/^HEALTHY|//')
+        STOPPED_LINE=$(echo "$RAW" | grep "^STOPPED|" | sed 's/^STOPPED|//')
+        echo -e "${GREEN}${BOLD}✅ PASS — Transition captured${NC}"
+        echo ""
+        echo -e "  Last Healthy row  → ${GREEN}$HEALTHY_LINE${NC}"
+        echo -e "  First Stopped row → ${RED}$STOPPED_LINE${NC}"
+    elif [[ "$STATUS" == PARTIAL* ]]; then
+        DETAIL=$(echo "$STATUS" | cut -d'|' -f2-)
+        echo -e "${YELLOW}${BOLD}⚠ PARTIAL — $DETAIL${NC}"
+        echo -e "${YELLOW}Select [c] from the menu in 2 minutes to recheck.${NC}"
+    else
+        DETAIL=$(echo "$STATUS" | cut -d'|' -f2-)
+        echo -e "${RED}${BOLD}❌ FAIL — $DETAIL${NC}"
+    fi
+
+    echo ""
+    save_snapshot "TC05" "verify"
     read -p "Press ENTER to continue..."
 }
 
@@ -403,7 +624,8 @@ scenario_5_recovery() {
 
     wait_and_check 180 "waiting for recovery detection"
     check_data 10
-    verify_scenario "TC-05 Recovery" "ANY" "OK" "ANY" "Recovering"
+    verify_scenario "TC-05 Recovery" "ANY" "OK" "None" "ANY"
+    save_snapshot "TC05" "verify"
     read -p "Press ENTER to continue..."
 }
 
@@ -463,6 +685,7 @@ PYEOF2
         echo -e "${RED}${BOLD}❌ FAIL — Expected BREACHING+Critical during drain${NC}"
     fi
     echo ""
+    save_snapshot "TC06" "verify"
     read -p "Press ENTER to continue..."
 }
 
@@ -538,6 +761,7 @@ PYEOF2
         echo -e "${RED}Portal → qbi-queue → Properties → Dead lettering on message expiration = ON${NC}"
     fi
     echo ""
+    save_snapshot "TC07" "verify"
     read -p "Press ENTER to continue..."
 }
 
@@ -556,6 +780,7 @@ scenario_8_idle_stale() {
     wait_and_check 300 "establishing idle state"
     check_data 8
     verify_scenario "TC-08 Idle Stale" "Idle" "OK" "None" "Healthy"
+    save_snapshot "TC08" "verify"
     read -p "Press ENTER to continue..."
 }
 
@@ -572,17 +797,17 @@ scenario_9_burst_arrival() {
     purge_queue
     wait_and_check 90 "confirming empty state"
     send_messages 25 "TC-09 burst arrival"
-    wait_and_check 90 "checking initial reaction"
+    wait_and_check 90 "checking initial reaction (within 2-min burst suppression window)"
     check_data 6
+    verify_not_consumer_stopped "TC-09 Burst Phase"
 
-    # This scenario ConsumerStopped is acceptable in minute 1
-    # but should NOT persist if consumer starts consuming
     echo -e "${CYAN}Now consume all messages to see transition:${NC}"
     echo -e "${YELLOW}→ Portal → Service Bus Explorer → Receive → ReceiveAndDelete → Receive 30${NC}"
     read -p "Press ENTER when consumed..."
     wait_and_check 120 "checking after consumption"
     check_data 8
     verify_scenario "TC-09 Burst Recovery" "ANY" "OK" "None" "ANY"
+    save_snapshot "TC09" "verify"
     read -p "Press ENTER to continue..."
 }
 
@@ -603,11 +828,13 @@ scenario_10_full_lifecycle() {
     purge_queue
     wait_and_check 90 "empty baseline"
     check_data 3
+    save_snapshot "TC10" "phase1_empty"
 
     echo -e "${BOLD}PHASE 2: Consumer stopped incident${NC}"
     send_messages 30 "phase 2 - incident"
     wait_and_check 180 "ConsumerStopped detection"
     check_data 5
+    save_snapshot "TC10" "phase2_consumer_stopped"
 
     echo -e "${BOLD}PHASE 3: Slow drain (simulate consumer restarted but slow)${NC}"
     echo -e "${YELLOW}Consume 5 messages (simulating slow consumer):${NC}"
@@ -615,6 +842,7 @@ scenario_10_full_lifecycle() {
     read -p "Press ENTER when consumed 5..."
     wait_and_check 120 "slow drain phase"
     check_data 5
+    save_snapshot "TC10" "phase3_slow_drain"
 
     echo -e "${BOLD}PHASE 4: Full recovery${NC}"
     echo -e "${YELLOW}Consume ALL remaining messages:${NC}"
@@ -622,6 +850,8 @@ scenario_10_full_lifecycle() {
     read -p "Press ENTER when all consumed..."
     wait_and_check 180 "recovery detection"
     check_data 10
+    verify_scenario "TC-10 Recovery" "ANY" "OK" "None" "ANY"
+    save_snapshot "TC10" "phase4_recovery"
 
     echo ""
     echo -e "${BOLD}Full lifecycle complete. Check data above for complete story.${NC}"
@@ -652,16 +882,18 @@ while true; do
     echo "║         QBIS TEST SCENARIOS — Interactive Menu            ║"
     echo "╚═══════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
-    echo -e "  ${GREEN}[1]${NC}  TC-01: Empty Queue Baseline         (no messages, no alerts)"
+    echo -e "  ${GREEN}[1]${NC}  TC-01: Empty Queue Baseline          (no messages, no alerts)"
     echo -e "  ${RED}[2]${NC}  TC-02: Consumer Stopped              (Critical within 2min)"
-    echo -e "  ${RED}[3]${NC}  TC-03: Growing Backlog               (escalating severity)"
+    echo -e "  ${RED}[3]${NC}  TC-03: Growing Backlog               (Warning → Critical progression)"
     echo -e "  ${GREEN}[4]${NC}  TC-04: Stable Balanced Queue         (no false alarms)"
-    echo -e "  ${CYAN}[5]${NC}  TC-05: Auto Recovery After Fix       (alert clears itself)"
-    echo -e "  ${YELLOW}[6]${NC}  TC-06: Slow Drain + SLA Breach       (Draining but Critical)"
+    echo -e "  ${RED}[5]${NC}  TC-05: Consumer Stops Mid-Operation  (state transition captured)"
+    echo -e "  ${CYAN}[6]${NC}  TC-06: Auto Recovery                 (alert clears itself)"
     echo -e "  ${YELLOW}[7]${NC}  TC-07: DLQ Growth                    (DLQ root cause)"
-    echo -e "  ${GREEN}[8]${NC}  TC-08: Idle Stale Messages           (no false Critical)"
-    echo -e "  ${YELLOW}[9]${NC}  TC-09: Burst Arrival on Empty Queue  (not ConsumerStopped)"
-    echo -e "  ${BLUE}[10]${NC} TC-10: Full Lifecycle                (complete incident story)"
+    echo -e "  ${YELLOW}[8]${NC}  TC-08: Monitor Delay                 (⚠ not yet implemented)"
+    echo -e "  ${GREEN}[9]${NC}  TC-09: Idle Stale Messages           (no false Critical)"
+    echo -e "  ${YELLOW}[10]${NC} TC-10: Large Backlog Slow Drain      (BREACHING sustained)"
+    echo -e "  ${BLUE}[11]${NC} EXTRA: Burst Arrival on Empty Queue  (not ConsumerStopped)"
+    echo -e "  ${BLUE}[12]${NC} FULL:  Full Lifecycle                 (complete incident story)"
     echo ""
     echo -e "  ${CYAN}[c]${NC}  Check current data (last 15 rows)"
     echo -e "  ${CYAN}[p]${NC}  Purge queue"
@@ -676,15 +908,27 @@ while true; do
         2)  scenario_2_consumer_stopped ;;
         3)  scenario_3_growing_backlog ;;
         4)  scenario_4_stable_balanced ;;
-        5)  scenario_5_recovery ;;
-        6)  scenario_6_slow_drain_breach ;;
+        5)  scenario_5_consumer_stops_mid_op ;;
+        6)  scenario_5_recovery ;;
         7)  scenario_7_dlq_growth ;;
-        8)  scenario_8_idle_stale ;;
-        9)  scenario_9_burst_arrival ;;
-        10) scenario_10_full_lifecycle ;;
+        8)  echo -e "${YELLOW}TC-08 (Monitor Delay) not yet implemented.${NC}" ; sleep 2 ;;
+        9)  scenario_8_idle_stale ;;
+        10) scenario_6_slow_drain_breach ;;
+        11) scenario_9_burst_arrival ;;
+        12) scenario_10_full_lifecycle ;;
         c|C) check_data 15 ; read -p "Press ENTER..." ;;
         p|P) purge_queue ; read -p "Press ENTER..." ;;
-        q|Q) echo "Bye!" ; exit 0 ;;
+        q|Q)
+            echo ""
+            echo -e "${GREEN}${BOLD}Results saved to: $RESULTS_DIR${NC}"
+            echo -e "  terminal.log       — full colored session log"
+            echo -e "  TC??_*_status.json — QueueStatus table rows per scenario"
+            echo -e "  TC??_*_snapshots.json — QueueSnapshot table rows per scenario"
+            echo -e "  TC??_*_alerts.json — AlertRecord table rows per scenario"
+            echo ""
+            echo "Bye!"
+            exit 0
+            ;;
         *)  echo "Invalid choice" ; sleep 1 ;;
     esac
 done
