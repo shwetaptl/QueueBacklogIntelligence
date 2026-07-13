@@ -5,6 +5,7 @@ backend/bin/
 backend/obj/
 backend/local.settings.json
 backend/publish/
+backend/Tests/TestResults/
 
 # Frontend
 frontend/node_modules/

@@ -230,13 +230,23 @@ namespace QueueBacklogIntelligence.Services
             // IDLE: queue has stale messages with no real traffic.
             // Uses relative threshold so it scales correctly.
             long recentPeak = snapshots.Take(10).Max(s => s.ActiveCount);
-            long idleThreshold = (long)Math.Min(
-                Math.Max(recentPeak * IdleRelativeThreshold, IdleAbsoluteMax),
+            long idleThreshold = (long)Math.Max(
+                recentPeak * IdleRelativeThreshold,
                 IdleAbsoluteMax);
+
+            // Azure Monitor has a 2-4 minute reporting delay. A single snapshot
+            // can show a spike (e.g. In=2.0) from messages sent minutes earlier,
+            // even though the queue is now genuinely idle. Averaging the last 3
+            // snapshots smooths out that one-sample artifact without masking
+            // sustained traffic (which would average above the threshold).
+            double smoothedIncoming = snapshots
+                .Take(3)
+                .Select(s => s.IncomingPerMin ?? 0.0)
+                .Average();
 
             bool isIdle = current.ActiveCount <= idleThreshold
                           && Math.Abs(netRateNow) <= noiseFloor
-                          && (current.IncomingPerMin ?? 0) < 1.0
+                          && smoothedIncoming < 1.0
                           && (current.OutgoingPerMin ?? 0) < 1.0
                           && previous.ActiveCount <= idleThreshold + 2;
 

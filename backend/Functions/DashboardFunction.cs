@@ -1,13 +1,9 @@
 using System.Globalization;
-using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
-using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.Extensions.Logging;
-using Microsoft.OpenApi.Models;
 using QueueBacklogIntelligence.Services;
 
 namespace QueueBacklogIntelligence.Functions
@@ -119,11 +115,6 @@ namespace QueueBacklogIntelligence.Functions
 
         // ── GET /api/queues ───────────────────────────────────────────────────
 
-        [OpenApiOperation(operationId: "GetQueues", tags: new[] { "Queues" },
-            Summary = "List all queues", Description = "Returns all configured queues with their current status.")]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json",
-            bodyType: typeof(QueueSummaryResponse[]),
-            Summary = "Array of queue summaries with live status")]
         [Function("GetQueues")]
         public async Task<IActionResult> GetQueues(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "queues")]
@@ -157,6 +148,7 @@ namespace QueueBacklogIntelligence.Functions
                     trendLabel      = s?.TrendLabel      ?? "Unknown",
                     rootCause       = s?.RootCause       ?? "Unknown",
                     alertSeverity   = s?.AlertSeverity   ?? "None",
+                    dlqCount        = s?.DLQCount        ?? 0,
                     gapPerMin       = s?.GapPerMin       ?? 0.0,
                     acceleration    = s?.Acceleration    ?? 0.0,
                     lastUpdatedUtc  = s?.TimestampUtc,
@@ -169,13 +161,6 @@ namespace QueueBacklogIntelligence.Functions
 
         // ── GET /api/queues/{queueName}/status ────────────────────────────────
 
-        [OpenApiOperation(operationId: "GetQueueStatus", tags: new[] { "Queues" },
-            Summary = "Get queue status", Description = "Returns the latest status snapshot for a specific queue.")]
-        [OpenApiParameter(name: "queueName", In = ParameterLocation.Path, Required = true,
-            Type = typeof(string), Description = "Name of the queue, e.g. qbi-queue")]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json",
-            bodyType: typeof(QueueSummaryResponse), Summary = "Current status of the queue")]
-        [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.NotFound, Summary = "Queue not found")]
         [Function("GetQueueStatus")]
         public async Task<IActionResult> GetQueueStatus(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "queues/{queueName}/status")]
@@ -212,14 +197,6 @@ namespace QueueBacklogIntelligence.Functions
 
         // ── GET /api/queues/{queueName}/history?minutes=30 ────────────────────
 
-        [OpenApiOperation(operationId: "GetQueueHistory", tags: new[] { "Queues" },
-            Summary = "Get queue status history", Description = "Returns status records for the last N minutes (default 30, max 120).")]
-        [OpenApiParameter(name: "queueName", In = ParameterLocation.Path, Required = true,
-            Type = typeof(string), Description = "Name of the queue")]
-        [OpenApiParameter(name: "minutes", In = ParameterLocation.Query, Required = false,
-            Type = typeof(int), Description = "How many minutes of history to return (1–120, default 30)")]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json",
-            bodyType: typeof(object[]), Summary = "Array of status records ordered oldest-first")]
         [Function("GetQueueHistory")]
         public async Task<IActionResult> GetQueueHistory(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "queues/{queueName}/history")]
@@ -252,14 +229,6 @@ namespace QueueBacklogIntelligence.Functions
 
         // ── GET /api/queues/{queueName}/snapshots?minutes=30 ─────────────────
 
-        [OpenApiOperation(operationId: "GetQueueSnapshots", tags: new[] { "Queues" },
-            Summary = "Get queue collector snapshots", Description = "Returns raw collector snapshots (active count, in/out rates) for the last N minutes.")]
-        [OpenApiParameter(name: "queueName", In = ParameterLocation.Path, Required = true,
-            Type = typeof(string), Description = "Name of the queue")]
-        [OpenApiParameter(name: "minutes", In = ParameterLocation.Query, Required = false,
-            Type = typeof(int), Description = "How many minutes of snapshots to return (1–120, default 30)")]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json",
-            bodyType: typeof(object[]), Summary = "Array of snapshot records ordered oldest-first")]
         [Function("GetQueueSnapshots")]
         public async Task<IActionResult> GetQueueSnapshots(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "queues/{queueName}/snapshots")]
@@ -286,12 +255,6 @@ namespace QueueBacklogIntelligence.Functions
 
         // ── GET /api/queues/{queueName}/alerts ────────────────────────────────
 
-        [OpenApiOperation(operationId: "GetQueueAlerts", tags: new[] { "Queues" },
-            Summary = "Get queue alert incidents", Description = "Returns the alert incident history for a queue (open and resolved incidents).")]
-        [OpenApiParameter(name: "queueName", In = ParameterLocation.Path, Required = true,
-            Type = typeof(string), Description = "Name of the queue")]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json",
-            bodyType: typeof(object[]), Summary = "Array of incident records")]
         [Function("GetQueueAlerts")]
         public async Task<IActionResult> GetQueueAlerts(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "queues/{queueName}/alerts")]
@@ -321,16 +284,6 @@ namespace QueueBacklogIntelligence.Functions
 
         // ── POST /api/queues — create queue config ────────────────────────────
 
-        [OpenApiOperation(operationId: "CreateQueue", tags: new[] { "Queue Config" },
-            Summary = "Create a queue", Description = "Adds a new queue configuration to the monitoring system.")]
-        [OpenApiRequestBody(contentType: "application/json", bodyType: typeof(QueueConfigRequest),
-            Required = true, Description = "Queue configuration to create")]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json",
-            bodyType: typeof(MessageResponse), Summary = "Queue created successfully")]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.BadRequest, contentType: "application/json",
-            bodyType: typeof(ErrorResponse), Summary = "Validation error")]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.Conflict, contentType: "application/json",
-            bodyType: typeof(ErrorResponse), Summary = "Queue already exists")]
         [Function("CreateQueue")]
         public async Task<IActionResult> CreateQueue(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "queues")]
@@ -378,16 +331,6 @@ namespace QueueBacklogIntelligence.Functions
 
         // ── PUT /api/queues/{queueName} — update queue config ─────────────────
 
-        [OpenApiOperation(operationId: "UpdateQueue", tags: new[] { "Queue Config" },
-            Summary = "Update a queue", Description = "Updates an existing queue configuration.")]
-        [OpenApiParameter(name: "queueName", In = ParameterLocation.Path, Required = true,
-            Type = typeof(string), Description = "Name of the queue to update")]
-        [OpenApiRequestBody(contentType: "application/json", bodyType: typeof(QueueConfigRequest),
-            Required = true, Description = "Updated queue configuration")]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json",
-            bodyType: typeof(MessageResponse), Summary = "Queue updated successfully")]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.NotFound, contentType: "application/json",
-            bodyType: typeof(ErrorResponse), Summary = "Queue not found")]
         [Function("UpdateQueue")]
         public async Task<IActionResult> UpdateQueue(
             [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "queues/{queueName}")]
@@ -438,14 +381,6 @@ namespace QueueBacklogIntelligence.Functions
 
         // ── DELETE /api/queues/{queueName} — remove queue config ──────────────
 
-        [OpenApiOperation(operationId: "DeleteQueue", tags: new[] { "Queue Config" },
-            Summary = "Delete a queue", Description = "Removes a queue configuration from the monitoring system.")]
-        [OpenApiParameter(name: "queueName", In = ParameterLocation.Path, Required = true,
-            Type = typeof(string), Description = "Name of the queue to delete")]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json",
-            bodyType: typeof(MessageResponse), Summary = "Queue deleted successfully")]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.NotFound, contentType: "application/json",
-            bodyType: typeof(ErrorResponse), Summary = "Queue not found")]
         [Function("DeleteQueue")]
         public async Task<IActionResult> DeleteQueue(
             [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "queues/{queueName}")]
@@ -466,10 +401,6 @@ namespace QueueBacklogIntelligence.Functions
 
         // ── GET /api/health ───────────────────────────────────────────────────
 
-        [OpenApiOperation(operationId: "GetHealth", tags: new[] { "System" },
-            Summary = "Health check", Description = "Returns system health: whether the collector and analyzer functions are running on schedule.")]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json",
-            bodyType: typeof(HealthResponse), Summary = "Health status — Healthy or Degraded")]
         [Function("GetHealth")]
         public async Task<IActionResult> GetHealth(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "health")]

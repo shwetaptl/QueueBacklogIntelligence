@@ -4,34 +4,14 @@ using Azure.Messaging.ServiceBus.Administration;
 using Azure.Monitor.Query;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
-using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
-using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Configurations;
-using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.OpenApi.Models;
 using QueueBacklogIntelligence.Services;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
 builder.ConfigureFunctionsWebApplication();
-
-// ── OpenAPI / Swagger config ───────────────────────────────────────────────
-builder.Services.AddSingleton<IOpenApiConfigurationOptions>(_ =>
-    new OpenApiConfigurationOptions
-    {
-        Info = new OpenApiInfo
-        {
-            Version     = "1.0.0",
-            Title       = "QBIS API",
-            Description = "Queue Backlog Intelligence System — REST API",
-        },
-        OpenApiVersion              = OpenApiVersionType.V3,
-        IncludeRequestingHostName   = true,
-        ForceHttps                  = false,
-        ForceHttp                   = false,
-    });
 
 // Read connection strings
 var sbConnection = Environment.GetEnvironmentVariable("ServiceBusConnectionString")
