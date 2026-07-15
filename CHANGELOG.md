@@ -65,7 +65,7 @@ All notable changes to Queue Backlog Intelligence System (QBIS) are documented h
 
 ---
 
-## [v1.0.1] — 2026-07-04
+## [v1.0.1] — 2026-06-20
 
 ### Documentation
 
@@ -74,7 +74,7 @@ All notable changes to Queue Backlog Intelligence System (QBIS) are documented h
 
 ---
 
-## [v1.0.0] — 2026-07-04
+## [v1.0.0] — 2026-06-11
 
 ### Initial Release
 
