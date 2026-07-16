@@ -7,5 +7,17 @@
     }
   },
   "watchDirectories": [],
-  "watchFiles": []
+  "watchFiles": [],
+  "cors": {
+    "allowedOrigins": [
+      "http://localhost:3000",
+      "http://localhost:5173"
+    ],
+    "allowedHeaders": [
+      "Content-Type",
+      "Authorization",
+      "x-functions-key"
+    ],
+    "supportCredentials": true
+  }
 }

@@ -75,7 +75,7 @@ namespace QueueBacklogIntelligence.Functions
         {
             req.HttpContext.Response.Headers["Access-Control-Allow-Origin"]  = "*";
             req.HttpContext.Response.Headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
-            req.HttpContext.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type";
+            req.HttpContext.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
         }
 
         private static ContentResult Json(object data) => new()

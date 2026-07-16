@@ -22,13 +22,9 @@ export function useAuthFetch() {
       return { Authorization: `Bearer ${result.accessToken}` }
     } catch (e) {
       if (e instanceof InteractionRequiredAuthError) {
-        // Silent refresh failed (e.g. expired consent) — fall back to popup
-        try {
-          const result = await instance.acquireTokenPopup(loginRequest)
-          return { Authorization: `Bearer ${result.accessToken}` }
-        } catch {
-          return {}
-        }
+        // Silent refresh failed — redirect to login
+        await instance.acquireTokenRedirect(loginRequest)
+        return {}
       }
       return {}
     }
