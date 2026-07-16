@@ -4,6 +4,55 @@ All notable changes to Queue Backlog Intelligence System (QBIS) are documented h
 
 ---
 
+## [v1.3.2] — 2026-07-16
+
+### Fixed
+
+- **CORS — Authorization header blocked** — `AddCors()` in `DashboardFunction.cs` only listed `Content-Type` in `Access-Control-Allow-Headers`; added `Authorization` so Bearer tokens are no longer rejected by the browser preflight check; updated `host.json` to match
+- **Login loop (block_nested_popups)** — switched `AuthProvider` from `loginPopup` to `loginRedirect` to avoid browser popup-blocking; switched `useAuthFetch` fallback from `acquireTokenPopup` to `acquireTokenRedirect`
+
+---
+
+## [v1.3.1] — 2026-07-14
+
+### Added
+
+- **KNOWN_ISSUES.md** — documents active known issues and system limitations: Azure Monitor ingestion delay, alert cooldown behaviour, single-namespace constraint, SMTP-only email, and SLA estimate accuracy
+
+### Removed
+
+- **`Dashboard.jsx`** — deleted orphaned file; `QueueDetail.jsx` replaced it in v1.2.0 and the old file was never referenced
+
+---
+
+## [v1.3.0] — 2026-07-13
+
+### Added — Authentication (Azure AD + MSAL React)
+
+- **Azure AD Easy Auth (backend)** — production API is now protected at the Azure Functions host level; tokens are validated by Azure before requests reach function code; zero backend code changes required (`AuthorizationLevel.Anonymous` remains — Easy Auth intercepts at the infrastructure layer)
+- **MSAL React v5 (frontend)** — added `@azure/msal-browser` and `@azure/msal-react`; full login redirect flow with Microsoft account sign-in screen
+- **`AuthProvider.jsx`** — wraps the app in `MsalProvider`; shows a "Sign in with Microsoft" screen when unauthenticated; displays login error messages inline; `VITE_AUTH_ENABLED=false` bypasses MSAL entirely for local dev
+- **`useAuthFetch.js`** — hook that acquires a Bearer token silently on every API call; falls back to `acquireTokenRedirect` if the token has expired; all API calls in `useFetch` automatically receive the `Authorization` header
+- **`msalConfig.js`** — MSAL instance config reading `VITE_AZURE_CLIENT_ID`, `VITE_AZURE_TENANT_ID`, `VITE_AZURE_API_SCOPE` from environment variables
+- **Local dev bypass** — `VITE_AUTH_ENABLED=false` in `.env.local` skips the login gate completely; backend is open locally (Easy Auth is an Azure-only infrastructure feature)
+
+### Added — Environment Variables
+
+- `VITE_AUTH_ENABLED` — `true` to require login, `false` to bypass for local dev
+- `VITE_AZURE_CLIENT_ID` — SPA app registration client ID
+- `VITE_AZURE_TENANT_ID` — Azure AD directory (tenant) ID
+- `VITE_AZURE_API_SCOPE` — API scope URI (`api://<api-client-id>/access_as_user`)
+
+---
+
+## [v1.2.1] — 2026-07-13
+
+### Documentation
+
+- Added `CHANGELOG.md` covering release history from v1.0.0 through v1.2.0
+
+---
+
 ## [v1.2.0] — 2026-07-13
 
 ### Added — Frontend Dashboard Redesign
