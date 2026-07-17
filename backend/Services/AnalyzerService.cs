@@ -678,19 +678,26 @@ namespace QueueBacklogIntelligence.Services
             if (isConsumerStopped)
                 return "ConsumerStopped";
 
-            // 3. IDLE / HEALTHY
-            if (isIdle || snapshots[0].ActiveCount == 0)
-                return "Healthy";
-
-            // 4. DLQ GROWTH — always available, no Monitor needed
+            // 3. DLQ GROWTH — must check before Healthy/Idle because an empty active queue
+            //    with a full DLQ is the primary DLQGrowth signal (all messages expired out).
             if (snapshots.Count >= 6)
             {
                 var newest = snapshots[0];
                 var older  = snapshots[Math.Min(5, snapshots.Count - 1)];
                 double dlqRate = (newest.DLQCount - older.DLQCount) / 5.0;
-                if (dlqRate > 1.0 && newest.DLQCount > 5)
+                bool rateGrowing = dlqRate > 1.0 && newest.DLQCount > 5;
+                // Burst-filled: DLQ is currently high AND snapshots[2..5] contain a zero,
+                // meaning the DLQ was empty recently before the burst (ignoring snapshots[0..1]
+                // which are already in the high state).
+                bool burstFilled = newest.DLQCount > 5 &&
+                                   snapshots.Skip(2).Take(4).Any(s => s.DLQCount == 0);
+                if (rateGrowing || burstFilled)
                     return "DLQGrowth";
             }
+
+            // 4. IDLE / HEALTHY
+            if (isIdle || snapshots[0].ActiveCount == 0)
+                return "Healthy";
 
             // 5. RATE-BASED ROOT CAUSES — requires Monitor data and baseline
             if (!derivedIncoming.HasValue || !derivedOutgoing.HasValue)
@@ -816,8 +823,10 @@ namespace QueueBacklogIntelligence.Services
                 return "None";
             }
 
-            // SLA is BREACHING but no wait time (consumer stopped or no rate)
-            if (result.SlaStatus == "BREACHING")
+            // SLA is BREACHING but no wait time (consumer stopped or no rate).
+            // Skip when root cause is Unknown — inherited BREACHING history is not
+            // evidence of a current breach when we lack rate data to confirm it.
+            if (result.SlaStatus == "BREACHING" && result.RootCause != "Unknown")
                 return "Critical";
 
             // Growing with no wait time — use sustained growing minutes as proxy

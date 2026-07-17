@@ -4,6 +4,16 @@ All notable changes to Queue Backlog Intelligence System (QBIS) are documented h
 
 ---
 
+## [v1.3.3] — 2026-07-16
+
+### Fixed
+
+- **DLQGrowth not detected when active queue empties** — `DLQGrowth` root cause check ran after the `ActiveCount == 0` early return, so a queue whose messages all expired to DLQ was always classified `Healthy`; moved DLQ check before the Healthy/Idle guard
+- **DLQGrowth missed burst-fill pattern** — rate check `(DLQ[0] - DLQ[5]) / 5 > 1.0` only caught gradual growth; added `burstFilled` condition: DLQ currently high AND any of `snapshots[2..5]` shows `DLQCount == 0`, catching the common case where all messages expire at once
+- **`Unknown` root cause incorrectly escalated to `Critical`** — when Monitor rate data was unavailable on the first snapshot after a burst, `SlaStatus` inherited `BREACHING` from recent history and `ComputeRawSeverity` returned `Critical` despite `RootCause = Unknown` (no evidence for the breach); added guard `result.RootCause != "Unknown"` on the BREACHING → Critical path
+
+---
+
 ## [v1.3.2] — 2026-07-16
 
 ### Fixed
