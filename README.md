@@ -53,6 +53,10 @@ graph TD
         AD -->|incident record| AR[(AlertRecord<br/>Table Storage)]
     end
 
+    CLN[CleanupFunction<br/>daily 02:00 UTC] -->|purge >24h| QSnap
+    CLN -->|purge >90d| QStat
+    CLN -->|purge >90d| AR
+
     subgraph React SPA - MSAL Auth
         UI[Overview + QueueDetail] -->|Bearer token| DF
     end
@@ -115,6 +119,7 @@ QueueBacklogIntelligence/
 │   │   ├── CollectorFunction.cs             # Timer :00 — collects raw metrics
 │   │   ├── AnalyzerFunction.cs              # Timer :30 — runs intelligence pipeline
 │   │   ├── AlertDispatcherFunction.cs       # Timer :45 — sends Teams + email alerts
+│   │   ├── CleanupFunction.cs               # Timer 02:00 UTC daily — table retention purge
 │   │   └── DashboardFunction.cs             # HTTP — 10 REST endpoints + CORS
 │   ├── Services/
 │   │   ├── CollectorService.cs              # Service Bus Admin API + Azure Monitor
@@ -188,6 +193,7 @@ Functions:
 
     AlertDispatcherFunction: timerTrigger
     AnalyzerFunction:        timerTrigger
+    CleanupFunction:         timerTrigger
     CollectorFunction:       timerTrigger
 
     CorsOptions:         [OPTIONS] http://localhost:7071/api/{*route}
@@ -204,7 +210,7 @@ Functions:
 Host started (546ms)
 ```
 
-All 13 functions (3 timers + 10 HTTP) must appear. If any are missing, check the startup error log.
+All 14 functions (4 timers + 10 HTTP) must appear. If any are missing, check the startup error log.
 
 Verify the backend is healthy:
 
@@ -327,12 +333,19 @@ By default, any user in your Azure AD tenant can authenticate. To restrict acces
 
 Tables are created automatically on startup via `EnsureTablesExistAsync()`. No manual creation needed.
 
-| Table | Purpose |
-|---|---|
-| `QueueConfig` | Monitoring config per queue (SLA, thresholds, webhook URL) |
-| `QueueSnapshot` | Raw metrics written every minute by Collector |
-| `QueueStatus` | Analyzed intelligence results written every minute by Analyzer |
-| `AlertRecord` | Open and resolved incident history |
+| Table | Purpose | Retention |
+|---|---|---|
+| `QueueConfig` | Monitoring config per queue (SLA, thresholds, webhook URL) | Forever |
+| `QueueSnapshot` | Raw metrics written every 30s by Collector | 24 hours |
+| `QueueStatus` | Analyzed intelligence results written every 30s by Analyzer | 90 days |
+| `AlertRecord` | Open and resolved incident history | 90 days |
+
+`CleanupFunction` runs automatically at **02:00 UTC every day** and purges rows beyond the retention window using Azure Table Storage batch deletes (100 rows per transaction). No manual maintenance needed. To trigger it manually during local development:
+
+```bash
+curl -X POST http://localhost:7071/admin/functions/CleanupFunction \
+  -H "Content-Type: application/json" -d "{}"
+```
 
 ### Adding a queue via API
 

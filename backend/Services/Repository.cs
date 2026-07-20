@@ -200,5 +200,68 @@ namespace QueueBacklogIntelligence.Services
             var table = _client.GetTableClient(ConfigTable);
             await table.DeleteEntityAsync(partitionKey, rowKey, Azure.ETag.All, ct);
         }
+
+        public Task<int> PurgeOldSnapshotsAsync(
+            string queueName, DateTime cutoff, CancellationToken ct = default)
+        {
+            // Reverse-tick RowKey: older rows have higher RowKey values.
+            var cutoffRowKey = (DateTime.MaxValue.Ticks - cutoff.Ticks).ToString("D19");
+            return PurgeByRowKeyAsync(SnapshotTable, queueName, cutoffRowKey, ct);
+        }
+
+        public Task<int> PurgeOldStatusAsync(
+            string queueName, DateTime cutoff, CancellationToken ct = default)
+        {
+            var cutoffRowKey = (DateTime.MaxValue.Ticks - cutoff.Ticks).ToString("D19");
+            return PurgeByRowKeyAsync(StatusTable, queueName, cutoffRowKey, ct);
+        }
+
+        public async Task<int> PurgeOldAlertRecordsAsync(
+            string queueName, DateTime cutoff, CancellationToken ct = default)
+        {
+            // AlertRecord uses a GUID RowKey — filter on OpenedAtUtc property instead.
+            var table = _client.GetTableClient(AlertTable);
+            var cutoffStr = cutoff.ToString("yyyy-MM-ddTHH:mm:ssZ");
+            var actions = new List<TableTransactionAction>();
+            await foreach (var e in table.QueryAsync<TableEntity>(
+                filter: $"PartitionKey eq '{queueName}' and OpenedAtUtc lt datetime'{cutoffStr}'",
+                select: new[] { "PartitionKey", "RowKey" },
+                cancellationToken: ct))
+            {
+                actions.Add(new TableTransactionAction(TableTransactionActionType.Delete, e));
+            }
+            return await BatchDeleteAsync(table, actions, ct);
+        }
+
+        // Deletes all rows in tableName/partitionKey whose RowKey is greater than cutoffRowKey.
+        // In the reverse-tick scheme, RowKey > cutoffRowKey means the row is older than the cutoff.
+        private async Task<int> PurgeByRowKeyAsync(
+            string tableName, string partitionKey, string cutoffRowKey, CancellationToken ct)
+        {
+            var table   = _client.GetTableClient(tableName);
+            var actions = new List<TableTransactionAction>();
+            await foreach (var e in table.QueryAsync<TableEntity>(
+                filter: $"PartitionKey eq '{partitionKey}' and RowKey gt '{cutoffRowKey}'",
+                select: new[] { "PartitionKey", "RowKey" },
+                cancellationToken: ct))
+            {
+                actions.Add(new TableTransactionAction(TableTransactionActionType.Delete, e));
+            }
+            return await BatchDeleteAsync(table, actions, ct);
+        }
+
+        // Submits delete actions in batches of 100 (Azure Table Storage transaction limit).
+        private static async Task<int> BatchDeleteAsync(
+            TableClient table, List<TableTransactionAction> actions, CancellationToken ct)
+        {
+            int deleted = 0;
+            for (int i = 0; i < actions.Count; i += 100)
+            {
+                var batch = actions.Skip(i).Take(100).ToList();
+                await table.SubmitTransactionAsync(batch, ct);
+                deleted += batch.Count;
+            }
+            return deleted;
+        }
     }
 }

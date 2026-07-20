@@ -47,5 +47,13 @@ namespace QueueBacklogIntelligence.Services
         // Queue config management (Settings page)
         Task DeleteQueueConfigAsync(
             string partitionKey, string rowKey, CancellationToken ct = default);
+
+        // Retention cleanup
+        Task<int> PurgeOldSnapshotsAsync(
+            string queueName, DateTime cutoff, CancellationToken ct = default);
+        Task<int> PurgeOldStatusAsync(
+            string queueName, DateTime cutoff, CancellationToken ct = default);
+        Task<int> PurgeOldAlertRecordsAsync(
+            string queueName, DateTime cutoff, CancellationToken ct = default);
     }
 }
