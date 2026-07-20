@@ -165,6 +165,18 @@ QueueBacklogIntelligence/
 
 ## Quick Start
 
+### Supported Environments
+
+| Environment | Details |
+|---|---|
+| **Local development OS** | macOS 12+, Windows 10/11, Ubuntu 20.04+ |
+| **Production (Azure)** | Azure-managed Linux — no OS configuration required |
+| **Browser** | Chrome 90+, Edge 90+, Firefox 90+, Safari 15+ |
+| **Minimum RAM (local)** | 4 GB — runs `func start` (.NET worker) + Vite dev server simultaneously |
+| **Disk space** | ~500 MB — .NET SDK + Node modules + build output |
+
+> Azure Functions and Azure Static Web Apps run on Linux in production regardless of which OS you develop on locally.
+
 ### Prerequisites
 
 - .NET 8 SDK
