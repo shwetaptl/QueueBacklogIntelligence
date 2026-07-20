@@ -50,3 +50,13 @@ The analyzer needs a minimum of 2 consecutive snapshots (60 seconds) before it c
 
 ### L-05 — SLA Wait Time Is an Estimate
 `WaitTimeMinutes` is calculated as `ActiveCount / OutgoingPerMin`. This is a queue-depth estimate, not a message-age measurement. It assumes uniform processing speed and does not account for message priority, consumer scaling, or message TTL.
+
+### L-06 — CleanupFunction Requires a Manual Trigger in Local Development
+`CleanupFunction` is scheduled via `TimerTrigger("0 0 2 * * *")` and only fires automatically on Azure at 02:00 UTC. In local development (`func start`) it must be triggered manually:
+
+```bash
+curl -X POST http://localhost:7071/admin/functions/CleanupFunction \
+  -H "Content-Type: application/json" -d "{}"
+```
+
+The function logs per-queue and total deleted counts to the console. Row counts can be verified with `az storage entity query` before and after.

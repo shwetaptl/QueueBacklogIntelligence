@@ -882,18 +882,17 @@ while true; do
     echo "║         QBIS TEST SCENARIOS — Interactive Menu            ║"
     echo "╚═══════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
-    echo -e "  ${GREEN}[1]${NC}  TC-01: Empty Queue Baseline          (no messages, no alerts)"
-    echo -e "  ${RED}[2]${NC}  TC-02: Consumer Stopped              (Critical within 2min)"
-    echo -e "  ${RED}[3]${NC}  TC-03: Growing Backlog               (Warning → Critical progression)"
-    echo -e "  ${GREEN}[4]${NC}  TC-04: Stable Balanced Queue         (no false alarms)"
-    echo -e "  ${RED}[5]${NC}  TC-05: Consumer Stops Mid-Operation  (state transition captured)"
-    echo -e "  ${CYAN}[6]${NC}  TC-06: Auto Recovery                 (alert clears itself)"
-    echo -e "  ${YELLOW}[7]${NC}  TC-07: DLQ Growth                    (DLQ root cause)"
-    echo -e "  ${YELLOW}[8]${NC}  TC-08: Monitor Delay                 (⚠ not yet implemented)"
-    echo -e "  ${GREEN}[9]${NC}  TC-09: Idle Stale Messages           (no false Critical)"
-    echo -e "  ${YELLOW}[10]${NC} TC-10: Large Backlog Slow Drain      (BREACHING sustained)"
-    echo -e "  ${BLUE}[11]${NC} EXTRA: Burst Arrival on Empty Queue  (not ConsumerStopped)"
-    echo -e "  ${BLUE}[12]${NC} FULL:  Full Lifecycle                 (complete incident story)"
+    echo -e "  ${GREEN}[1]${NC}  TC-01: Empty Queue Baseline               (no messages, no alerts)"
+    echo -e "  ${RED}[2]${NC}  TC-02: Consumer Stopped                   (Critical within 2min)"
+    echo -e "  ${RED}[3]${NC}  TC-03: Growing Backlog                     (Warning → Critical progression)"
+    echo -e "  ${GREEN}[4]${NC}  TC-04: Stable Balanced Queue              (no false alarms)"
+    echo -e "  ${RED}[5]${NC}  TC-05: Consumer Stops Mid-Operation        (state transition captured)"
+    echo -e "  ${CYAN}[6]${NC}  TC-05: Auto Recovery After Fix            (alert clears itself)"
+    echo -e "  ${YELLOW}[7]${NC}  TC-06: Slow Drain While Breaching SLA    (BREACHING sustained)"
+    echo -e "  ${YELLOW}[8]${NC}  TC-07: DLQ Growth                         (DLQ root cause)"
+    echo -e "  ${GREEN}[9]${NC}  TC-08: Idle Queue with Stale Messages     (no false Critical)"
+    echo -e "  ${YELLOW}[10]${NC} TC-09: Burst Arrival on Empty Queue       (not ConsumerStopped)"
+    echo -e "  ${BLUE}[11]${NC} TC-10: Full Lifecycle                      (complete incident story)"
     echo ""
     echo -e "  ${CYAN}[c]${NC}  Check current data (last 15 rows)"
     echo -e "  ${CYAN}[p]${NC}  Purge queue"
@@ -910,12 +909,11 @@ while true; do
         4)  scenario_4_stable_balanced ;;
         5)  scenario_5_consumer_stops_mid_op ;;
         6)  scenario_5_recovery ;;
-        7)  scenario_7_dlq_growth ;;
-        8)  echo -e "${YELLOW}TC-08 (Monitor Delay) not yet implemented.${NC}" ; sleep 2 ;;
+        7)  scenario_6_slow_drain_breach ;;
+        8)  scenario_7_dlq_growth ;;
         9)  scenario_8_idle_stale ;;
-        10) scenario_6_slow_drain_breach ;;
-        11) scenario_9_burst_arrival ;;
-        12) scenario_10_full_lifecycle ;;
+        10) scenario_9_burst_arrival ;;
+        11) scenario_10_full_lifecycle ;;
         c|C) check_data 15 ; read -p "Press ENTER..." ;;
         p|P) purge_queue ; read -p "Press ENTER..." ;;
         q|Q)

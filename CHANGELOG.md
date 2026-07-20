@@ -4,6 +4,19 @@ All notable changes to Queue Backlog Intelligence System (QBIS) are documented h
 
 ---
 
+## [v1.4.0] — 2026-07-20
+
+### Added
+
+- **`CleanupFunction`** — new daily timer Azure Function (02:00 UTC, `TimerTrigger("0 0 2 * * *")`) that purges old rows from all three storage tables per configured retention windows: `QueueSnapshot` rows older than 24 hours, `QueueStatus` rows older than 90 days, `AlertRecord` rows older than 90 days; prevents unbounded table growth at the current ~1,440 writes/hour rate; logs per-queue and total deleted counts; individual queue failures are caught and logged without aborting the rest of the run
+- **`PurgeOldSnapshotsAsync` / `PurgeOldStatusAsync` / `PurgeOldAlertRecordsAsync`** — three new `IRepository` / `Repository` methods; snapshot and status tables use reverse-tick RowKey range filter (`RowKey gt cutoffRowKey`) for efficient deletes without full-table scans; alert records use an OData `OpenedAtUtc lt datetime'...'` filter because their RowKey is a GUID with no time ordering; all deletes are batched in groups of 100 (Azure Table Storage transaction limit per batch)
+
+### Fixed
+
+- **`test_scenarios.sh` menu/function number mismatch** — interactive menu positions [6]–[12] did not match the functions they invoked or the banners those functions display; root causes: a fake "TC-08: Monitor Delay (not yet implemented)" placeholder blocked the real TC-08, and TC-06 Slow Drain had drifted to position [10] while TC-09 Burst was labelled "EXTRA"; fixed by removing the placeholder, inserting TC-06 at [7], and reassigning [7]–[11] so every menu number, label, and case branch aligns with the corresponding function banner (TC-06 through TC-10 in order)
+
+---
+
 ## [v1.3.3] — 2026-07-16
 
 ### Fixed
