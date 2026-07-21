@@ -19,6 +19,13 @@ The analyzer needs a minimum of 2 consecutive snapshots (60 seconds) before it c
 ### L-06 — CleanupFunction Requires a Manual Trigger in Local Development
 `CleanupFunction` is scheduled via `TimerTrigger("0 0 2 * * *")` and only fires automatically on Azure at 02:00 UTC. In local development (`func start`) it must be triggered manually:
 
+```bash
+curl -X POST http://localhost:7071/admin/functions/CleanupFunction \
+  -H "Content-Type: application/json" -d "{}"
+```
+
+The function logs per-queue and total deleted counts to the console. Row counts can be verified with `az storage entity query` before and after.
+
 ### L-07 — Azure Monitor Metric Delay (2–4 minutes)
 Azure Monitor metrics (`IncomingMessages`, `OutgoingMessages`) are not real-time — they have a 2 to 4 minute reporting delay. The analyzer may briefly misclassify a healthy queue as `ConsumerStopped` immediately after a burst arrival because the outgoing rate appears zero until Azure catches up.
 
