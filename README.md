@@ -27,14 +27,16 @@ QBIS answers all three automatically, in under 10 seconds on the dashboard.
 ## Screenshots
 
 ### Multi-Queue Overview
-![Dashboard](docs/screenshots/dashboard.png)
+![Dashboard](docs/screenshots/Overview.png)
 
 ### Incident Alert Banner
 ![Incident Banner](docs/screenshots/incident-banner.png)
 
 ### Historical Chart with Root Cause Timeline
-![Chart](docs/screenshots/chart.png)
+![Chart](docs/screenshots/QueueDetails.png)
 
+### Queue Settings
+![Queue Settings](docs/screenshots/Settings.png)
 ---
 
 ## Architecture
