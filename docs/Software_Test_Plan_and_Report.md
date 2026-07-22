@@ -14,7 +14,7 @@
 | **Branch**          | main                                                                   |
 | **Commit SHA**      | dda88ab (v1.4.1)                                                       |
 | **Release Version** | v1.4.1                                                                 |
-| **Document Version**| v1.0                                                                   |
+| **Document Version**| v1.1                                                                   |
 | **Last Updated**    | 2026-07-21                                                             |
 
 ---
@@ -24,6 +24,7 @@
 | Version | Date       | Git Commit | Description               | Author        |
 |---------|------------|------------|---------------------------|---------------|
 | v1.0    | 2026-07-21 | dda88ab    | Initial test plan created | Shweta Patel  |
+| v1.1    | 2026-07-22 | 4e46edb    | Fixed three factual errors: (A) storage table count 3→4 (QueueConfig added); (B) Traceability Matrix FR IDs realigned to PRD v1.2 exactly; (C) Collector cadence corrected from "every 30 seconds" to "every 60 seconds". | Shweta Patel  |
 
 ---
 
@@ -61,11 +62,11 @@ This document defines the test approach, test cases, execution results, and qual
 
 ### 1.2 System Under Test
 
-QBIS is an Azure-hosted monitoring system that polls one or more Azure Service Bus queues every 30 seconds, classifies queue health using a nine-step intelligence pipeline, and dispatches alerts via Microsoft Teams and SMTP email when SLA thresholds are breached. The system consists of:
+QBIS is an Azure-hosted monitoring system that polls one or more Azure Service Bus queues every 60 seconds, classifies queue health using a nine-step intelligence pipeline, and dispatches alerts via Microsoft Teams and SMTP email when SLA thresholds are breached. The system consists of:
 
 - **Backend**: .NET 8 isolated-worker Azure Functions v4 (five functions: Collector, Analyzer, AlertDispatcher, Cleanup, Dashboard)
 - **Frontend**: React 18 + Vite 6 + Tailwind CSS v4 single-page application
-- **Storage**: Azure Table Storage (three tables: QueueSnapshot, QueueStatus, AlertRecord)
+- **Storage**: Azure Table Storage (four tables: QueueConfig, QueueSnapshot, QueueStatus, AlertRecord)
 - **Message broker**: Azure Service Bus (single namespace `qbi-sb-ns`, queue `qbi-queue`)
 
 ### 1.3 Document Scope
@@ -115,7 +116,7 @@ This document covers manual black-box testing of the QBIS backend analysis pipel
 QBIS uses **manual black-box end-to-end testing** executed against a live Azure environment. Each test scenario:
 
 1. Sends or drains messages from the Azure Service Bus queue via Azure Portal Service Bus Explorer
-2. Waits for the Collector (30-second timer) to capture snapshots and the Analyzer to classify them
+2. Waits for the Collector (one-minute timer, `0 */1 * * * *`) to capture snapshots and the Analyzer to classify them (runs 30 seconds after each Collector cycle)
 3. Queries Azure Table Storage directly via the Azure CLI to read `QueueStatus` rows
 4. Compares actual values against expected values using assertions embedded in `test_scenarios.sh`
 
@@ -387,30 +388,30 @@ Each test run creates a timestamped directory under `backend/Tests/TestResults/Y
 
 ## 9. Test Traceability Matrix
 
-Each functional requirement traces to the Level-2 capability it implements and to the test scenario(s) that verify it.
+FR IDs and Level-2 Capability names are taken directly from PRD v1.2, Section 9. Every FR that appears in the PRD must appear here.
 
-| FR ID | Level-2 Capability | Requirement Description | Test Scenario(s) |
-|-------|--------------------|-------------------------|-----------------|
-| FR-1.1.1 | Collect Queue Metrics | Collector shall poll Azure Service Bus Administration API every 30 seconds to capture `ActiveMessageCount` and `DeadLetterMessageCount` | TC-01, TC-02, TC-10 |
-| FR-1.2.1 | Collect Rate Metrics | Collector shall retrieve `IncomingMessages` and `OutgoingMessages` per minute from Azure Monitor Metrics | Not directly verified; transitively exercised by all scenarios |
-| FR-1.3.1 | Persist Snapshots | Collector shall write one `QueueSnapshot` row per cycle to Azure Table Storage | Verified by `save_snapshot` artifact capture across all runs |
-| FR-2.1.1 | Classify Root Cause | Analyzer shall classify each snapshot into one of eight root cause values within one Collector cycle | TC-01, TC-02, TC-03, TC-04, TC-06, TC-10 |
-| FR-2.2.1 | Compute SLA Status | Analyzer shall compute `SlaStatus` (`OK`/`BREACHING`/`UNKNOWN`) and `WaitTimeMinutes` estimate | TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08, TC-09, TC-10 |
-| FR-2.3.1 | Compute Trend Label | Analyzer shall assign a `TrendLabel` to each snapshot | TC-01, TC-02, TC-03, TC-06, TC-10 |
-| FR-3.1.1 | Persist Status | Analyzer shall write one `QueueStatus` row per cycle to Azure Table Storage | All scenarios (queried by `verify_scenario`) |
-| FR-3.2.1 | Dispatch Teams Alert | AlertService shall send a Teams webhook notification when `NeedToSendAlert=true` | Verified via `AlertRecord` artifacts; not separately scenario-tested |
-| FR-3.3.1 | Dispatch Email Alert | AlertService shall send an SMTP email when `EmailRecipients` is configured | Out of scope (requires live SMTP credentials) |
-| FR-4.1.1 | Serve Queue List | Dashboard API shall return all configured queues via `GET /api/queues` | Not scenario-tested; verified manually during development |
-| FR-4.2.1 | Serve Queue Status | Dashboard API shall return current status via `GET /api/queues/{name}/status` | Not scenario-tested |
-| FR-4.3.1 | Serve Queue History | Dashboard API shall return snapshot history via `GET /api/queues/{name}/history` | Not scenario-tested |
-| FR-5.1.1 | Display Overview | Frontend shall display a multi-queue overview page with KPI tiles and Queue Health Grid | Not scenario-tested |
-| FR-5.2.1 | Display Queue Detail | Frontend shall display a per-queue detail page with activity chart and incident table | Not scenario-tested |
-| FR-5.3.1 | Configure Queues | Frontend shall allow adding, editing, and enabling/disabling queue configurations | Not scenario-tested |
-| FR-6.1.1 | Authenticate User | Azure AD Easy Auth shall reject unauthenticated API requests with HTTP 401 | Not scenario-tested (Azure-only) |
-| FR-6.2.1 | Acquire Token | MSAL React shall acquire a Bearer token silently on each API call | Not scenario-tested |
-| FR-6.3.1 | Bypass Auth (Dev) | `VITE_AUTH_ENABLED=false` shall skip MSAL and allow unauthenticated local access | Implicitly exercised by all local dev test runs |
-| FR-7.1.1 | Purge Old Snapshots | CleanupFunction shall delete `QueueSnapshot` rows older than 24 hours | Not scenario-tested |
-| FR-7.2.1 | Purge Old Records | CleanupFunction shall delete `QueueStatus` and `AlertRecord` rows older than 90 days | Not scenario-tested |
+| FR ID | PRD Level-2 Capability | Requirement Description | Test Scenario(s) |
+|-------|-----------------------|-------------------------|-----------------|
+| FR-1.1.1 | Query Service Bus runtime properties | The Collector Service shall retrieve Service Bus runtime properties for each configured queue within the collector execution window. | TC-01, TC-02, TC-10 (implicitly all scenarios) |
+| FR-1.2.1 | Query Azure Monitor metrics | The Collector Service shall request incoming and outgoing per-minute metrics for each configured queue when Azure Monitor data is available. | Transitively exercised by all scenarios; not directly asserted |
+| FR-1.3.1 | Persist raw queue snapshots | The Repository shall persist each collected queue snapshot in the QueueSnapshot table using the reverse timestamp row key pattern. | Verified by `save_snapshot` artifact capture across all runs |
+| FR-2.1.1 | Compute queue deltas and trends | The Analyzer Service shall compute active-count deltas, smoothed rate values, and acceleration from recent queue snapshots. | TC-01, TC-02, TC-03, TC-06, TC-10 (TrendLabel asserted) |
+| FR-2.2.1 | Classify queue root cause | The Analyzer Service shall classify queue health into one of the supported root-cause outcomes based on recent queue behavior and rate patterns. | TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08, TC-09, TC-10 |
+| FR-2.3.1 | Estimate wait time and SLA status | The Analyzer Service shall estimate wait time and SLA status from the current queue state and the derived outgoing rate. | TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08, TC-09, TC-10 |
+| FR-3.1.1 | Determine alert severity | The Alert Service shall assign an alert severity of None, Warning, or Critical for each computed queue status. | TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08, TC-09, TC-10 |
+| FR-3.2.1 | Dispatch Teams notifications | The Alert Service shall send a Teams webhook notification when an incident requires alert dispatch. | Verified via `AlertRecord` artifacts; not separately scenario-tested |
+| FR-3.3.1 | Dispatch email notifications | The Alert Service shall send an SMTP email notification when email recipients are configured for the queue. | Out of scope — requires live SMTP credentials not present in test environment |
+| FR-4.1.1 | Create queue configuration | The Dashboard Function shall accept a queue configuration request and create a new monitored queue record. | Not scenario-tested |
+| FR-4.2.1 | Update queue configuration | The Dashboard Function shall update an existing queue configuration record when the user submits a valid configuration change. | Not scenario-tested |
+| FR-4.3.1 | Delete queue configuration | The Dashboard Function shall delete a monitored queue configuration record when the user issues a delete request. | Not scenario-tested |
+| FR-5.1.1 | Return queue summaries | The Dashboard Function shall return a current queue summary response containing the queue status for all monitored queues. | Not scenario-tested |
+| FR-5.2.1 | Return queue history | The Dashboard Function shall return historical status records for a specific queue over a requested range. | Not scenario-tested |
+| FR-5.3.1 | Return alert history | The Dashboard Function shall return incident and alert history records for a queue from the AlertRecord table. | Not scenario-tested |
+| FR-6.1.1 | Purge old snapshots | The Cleanup Function shall purge QueueSnapshot rows older than the configured retention window. | Not scenario-tested |
+| FR-6.2.1 | Purge old status records | The Cleanup Function shall purge QueueStatus rows older than the configured retention window. | Not scenario-tested |
+| FR-6.3.1 | Purge old alert records | The Cleanup Function shall purge AlertRecord rows older than the configured retention window. | Not scenario-tested |
+| FR-7.1.1 | Protect API access through Azure AD Easy Auth | The backend API shall require Azure AD Easy Auth protection in production environments. | Not scenario-tested (Azure-only infrastructure feature) |
+| FR-7.2.1 | Allow frontend token-based access | The frontend shall provide a token acquisition flow that allows authenticated API requests. | Not scenario-tested; MSAL bypass (`VITE_AUTH_ENABLED=false`) implicitly exercised by all local dev runs |
 
 ---
 
@@ -571,16 +572,16 @@ No TestResults run was required for this fix as it affected navigation only, not
 
 ### 15.1 Functional Requirement Coverage
 
-| Category | FR Count | FRs with ≥1 Assertion | Coverage |
-|----------|----------|----------------------|----------|
-| Collector (FR-1.x.x) | 3 | 1 (FR-1.1.1) | 33% |
-| Analyzer (FR-2.x.x) | 3 | 3 (FR-2.1.1, FR-2.2.1, FR-2.3.1) | 100% |
-| Storage / Alerts (FR-3.x.x) | 3 | 1 (FR-3.1.1) | 33% |
-| Dashboard API (FR-4.x.x) | 3 | 0 | 0% |
-| Frontend (FR-5.x.x) | 3 | 0 | 0% |
-| Authentication (FR-6.x.x) | 3 | 0 (manual only) | 0% |
-| Cleanup (FR-7.x.x) | 2 | 0 | 0% |
-| **Total** | **20** | **5** | **25%** |
+| PRD Level-1 Capability | Category (FR-x.x.x) | FR Count | FRs with ≥1 Assertion | Coverage |
+|------------------------|---------------------|----------|----------------------|----------|
+| Collect Queue Metrics | FR-1.x.x | 3 | 1 (FR-1.1.1) | 33% |
+| Analyze Queue Health | FR-2.x.x | 3 | 3 (FR-2.1.1, FR-2.2.1, FR-2.3.1) | 100% |
+| Manage Alerting | FR-3.x.x | 3 | 1 (FR-3.1.1) | 33% |
+| Manage Queue Configurations | FR-4.x.x | 3 | 0 | 0% |
+| Expose Dashboard Data | FR-5.x.x | 3 | 0 | 0% |
+| Retain Operational Data | FR-6.x.x | 3 | 0 | 0% |
+| Authenticate Access | FR-7.x.x | 2 | 0 | 0% |
+| **Total** | | **20** | **5** | **25%** |
 
 ### 15.2 Root Cause Coverage
 
