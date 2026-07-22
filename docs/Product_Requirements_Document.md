@@ -3,14 +3,14 @@
 ## Cover Page
 
 - Project Name: Queue Backlog Intelligence System (QBIS)
-- Student(s): To Be Completed
+- Student(s): Shweta Patel
 - Course: CISC 593/594
 - Semester: To Be Completed
 - Repository URL: https://github.com/shwetaptl/QueueBacklogIntelligence.git
 - Current Branch: main
-- Current Commit SHA: 9e37977e5a0a8517884b81e37c3ee480b76dfde1
-- Current Release Version: v1.4.0
-- Document Version: v1.0
+- Current Commit SHA: 74e9f743fbe37fd6f0eafde1c926ac6bb5d317fe
+- Current Release Version: v1.4.1
+- Document Version: v1.1
 - Last Updated: 2026-07-21
 
 ---
@@ -19,7 +19,8 @@
 
 | Version | Date | Git Commit | Description | Author |
 |----------|------|------------|-------------|--------|
-| v1.0 | 2026-07-21 | 9e37977e5a0a8517884b81e37c3ee480b76dfde1 | Initial PRD creation aligned to repository evidence for the current QBIS implementation. | To Be Completed |
+| v1.0 | 2026-07-21 | 9e37977e5a0a8517884b81e37c3ee480b76dfde1 | Initial PRD creation aligned to repository evidence for the current QBIS implementation. | Shweta Patel |
+| v1.1 | 2026-07-21 | 74e9f743fbe37fd6f0eafde1c926ac6bb5d317fe | Updated cover page (student name, commit SHA, release version v1.4.1, document version); resolved stakeholder and author To Be Completed items traceable from the repository. | Shweta Patel |
 
 ---
 
@@ -59,7 +60,7 @@ When a Service Bus queue backs up, on-call engineers need an immediate answer to
 
 ## Stakeholders
 
-- Repository owner and project developer(s): To Be Completed
+- Repository owner and project developer: Shweta Patel
 - Azure infrastructure and operations stakeholders: To Be Completed
 - End users of the monitoring dashboard: To Be Completed
 
@@ -83,7 +84,7 @@ When a Service Bus queue backs up, on-call engineers need an immediate answer to
 
 ## Planned Software Versions
 
-- Current release in repository: v1.4.0
+- Current release in repository: v1.4.1
 - Prior documented release history exists in [CHANGELOG.md](../CHANGELOG.md)
 - Future versions are described in Section 15 and are subject to change
 
@@ -478,7 +479,7 @@ To Be Completed.
 
 | Issue | Status |
 |-------|--------|
-| Student, course, and semester metadata have not been documented in the repository and therefore remain To Be Completed. | To Be Completed |
+| Semester metadata has not been documented in the repository. | To Be Completed |
 | Version 2 and Version 3 roadmap details are not yet documented in the repository. | To Be Completed |
 | Hardware interface details are not specified in the repository documentation. | To Be Completed |
 | AI Explainability and AI Safety requirements are not documented in the repository evidence. | To Be Completed |
