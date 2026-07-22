@@ -10,7 +10,7 @@
 - Current Branch: main
 - Current Commit SHA: 74e9f743fbe37fd6f0eafde1c926ac6bb5d317fe
 - Current Release Version: v1.4.1
-- Document Version: v1.1
+- Document Version: v1.2
 - Last Updated: 2026-07-21
 
 ---
@@ -21,6 +21,7 @@
 |----------|------|------------|-------------|--------|
 | v1.0 | 2026-07-21 | 9e37977e5a0a8517884b81e37c3ee480b76dfde1 | Initial PRD creation aligned to repository evidence for the current QBIS implementation. | Shweta Patel |
 | v1.1 | 2026-07-21 | 74e9f743fbe37fd6f0eafde1c926ac6bb5d317fe | Updated cover page (student name, commit SHA, release version v1.4.1, document version); resolved stakeholder and author To Be Completed items traceable from the repository. | Shweta Patel |
+| v1.2 | 2026-07-21 | 082d3dc | Added Section 8 Preventative Requirements (Q2 explicit layer); renumbered subsequent sections 8–17 to 9–18. | Shweta Patel |
 
 ---
 
@@ -33,16 +34,17 @@
 5. [Risk Analysis](#5-risk-analysis)
 6. [Risk Prioritization](#6-risk-prioritization)
 7. [Risk Mitigation](#7-risk-mitigation)
-8. [Functional Requirements](#8-functional-requirements)
-9. [Quality Requirements](#9-quality-requirements)
-10. [Performance Requirements](#10-performance-requirements)
-11. [Assumptions](#11-assumptions)
-12. [Constraints](#12-constraints)
-13. [External Interfaces](#13-external-interfaces)
-14. [Requirements Traceability Matrix](#14-requirements-traceability-matrix)
-15. [Future Versions](#15-future-versions)
-16. [Open Issues](#16-open-issues)
-17. [Glossary](#17-glossary)
+8. [Preventative Requirements](#8-preventative-requirements)
+9. [Functional Requirements](#9-functional-requirements)
+10. [Quality Requirements](#10-quality-requirements)
+11. [Performance Requirements](#11-performance-requirements)
+12. [Assumptions](#12-assumptions)
+13. [Constraints](#13-constraints)
+14. [External Interfaces](#14-external-interfaces)
+15. [Requirements Traceability Matrix](#15-requirements-traceability-matrix)
+16. [Future Versions](#16-future-versions)
+17. [Open Issues](#17-open-issues)
+18. [Glossary](#18-glossary)
 
 ---
 
@@ -304,7 +306,25 @@ Sorted by descending risk score.
 
 ---
 
-# 8. Functional Requirements
+# 8. Preventative Requirements
+
+Preventative requirements state what the system must **never** do. Each requirement is a hard invariant that, if violated, directly causes the corresponding Undesirable Event. These are the Q2 layer — distinct from Q1 (desired behavior, Section 9) and Q3 (responsive behavior, Section 7).
+
+| PR ID | UE ID | Preventative Requirement |
+|-------|-------|--------------------------|
+| PR-2.2-01 | UE-2.2-01 | The Analyzer Service must never classify a burst arrival on a previously empty queue as `ConsumerStopped`; the `queueWasRecentlyEmpty` guard must suppress this classification for at least 2 minutes after a burst. |
+| PR-2.2-02 | UE-2.2-01 | The Analyzer Service must never escalate `AlertSeverity` to `Critical` when `RootCause = Unknown`; insufficient evidence must not be treated as a confirmed breach. |
+| PR-3.1-01 | UE-3.1-01 | The Alert Service must never de-escalate alert severity from `Critical` or `Warning` after fewer than 2 consecutive OK-severity readings (sticky severity rule). |
+| PR-1.2-01 | UE-1.2-01 | The Analyzer Service must never use a single raw Azure Monitor rate snapshot as the sole basis for root cause classification; smoothed values from at least 3 snapshots must be used. |
+| PR-2.3-01 | UE-2.3-01 | The Analyzer Service must never report a finite positive `WaitTimeMinutes` value when the outgoing rate is zero or statistically unreliable; the value must be expressed as infinite or indeterminate in that state. |
+| PR-3.2-01 | UE-3.2-01 | The Alert Service must never send a legacy MessageCard Teams payload to a non-`webhook.office.com` URL, and must never send an Adaptive Card payload to a `webhook.office.com` URL. |
+| PR-6.1-01 | UE-6.1-01 | The Cleanup Function must never delete records that fall within the configured retention window; only rows with a timestamp older than the retention cutoff are eligible for removal. |
+| PR-7.1-01 | UE-7.1-01 | The backend API must never expose `ServiceBusConnectionString`, `StorageConnectionString`, or any other credential value in an API response body, HTTP header, or application log entry. |
+| PR-4.3-01 | UE-4.3-01 | The Dashboard Function must never delete a queue configuration record through an automated or background process; deletion must occur only in response to an explicit, user-initiated delete request. |
+
+---
+
+# 9. Functional Requirements
 
 | Requirement ID | Level-2 Capability | Functional Requirement |
 |----------------|--------------------|------------------------|
@@ -331,7 +351,7 @@ Sorted by descending risk score.
 
 ---
 
-# 9. Quality Requirements
+# 10. Quality Requirements
 
 The repository evidence supports the following measurable quality expectations.
 
@@ -352,7 +372,7 @@ The repository evidence supports the following measurable quality expectations.
 
 ---
 
-# 10. Performance Requirements
+# 11. Performance Requirements
 
 | Requirement | Measurable Target |
 |-------------|-------------------|
@@ -365,7 +385,7 @@ The repository evidence supports the following measurable quality expectations.
 
 ---
 
-# 11. Assumptions
+# 12. Assumptions
 
 - The repository is intended to monitor Azure Service Bus queues rather than other messaging systems.
 - Azure Monitor rate data may be delayed and therefore is treated as secondary evidence relative to the Service Bus Admin API.
@@ -376,7 +396,7 @@ The repository evidence supports the following measurable quality expectations.
 
 ---
 
-# 12. Constraints
+# 13. Constraints
 
 | Area | Constraint |
 |------|------------|
@@ -390,7 +410,7 @@ The repository evidence supports the following measurable quality expectations.
 
 ---
 
-# 13. External Interfaces
+# 14. External Interfaces
 
 ## User Interfaces
 
@@ -425,7 +445,7 @@ The repository evidence supports the following measurable quality expectations.
 
 ---
 
-# 14. Requirements Traceability Matrix
+# 15. Requirements Traceability Matrix
 
 | Requirement ID | Level-2 Capability | Requirement Description |
 |----------------|--------------------|------------------------|
@@ -452,7 +472,7 @@ The repository evidence supports the following measurable quality expectations.
 
 ---
 
-# 15. Future Versions
+# 16. Future Versions
 
 ## Version 1
 
@@ -475,7 +495,7 @@ To Be Completed.
 
 ---
 
-# 16. Open Issues
+# 17. Open Issues
 
 | Issue | Status |
 |-------|--------|
@@ -487,7 +507,7 @@ To Be Completed.
 
 ---
 
-# 17. Glossary
+# 18. Glossary
 
 | Term | Definition |
 |------|------------|
