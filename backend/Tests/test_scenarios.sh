@@ -14,6 +14,7 @@ NAMESPACE="qbi-sb-ns"
 QUEUE="qbi-queue"
 RESOURCE_GROUP="qbi-rg"
 STORAGE_ACCOUNT="queuebacklogsa"
+BASE_URL="http://localhost:7071/api"
 
 # Read connection string from local.settings.json
 STORAGE_CONN=$(python3 -c "
@@ -862,6 +863,429 @@ scenario_10_full_lifecycle() {
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# API SCENARIOS (TC-11 – TC-16): Dashboard REST API + Queue Config CRUD
+# ═══════════════════════════════════════════════════════════════════════════
+
+scenario_11_get_queue_summaries() {
+    echo ""
+    echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}${BLUE} TC-11: GET QUEUE SUMMARIES — FR-5.1.1${NC}"
+    echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "What:    GET /api/queues returns current status for all monitored queues"
+    echo -e "Expect:  HTTP 200, JSON array containing an entry with queueName=$QUEUE"
+    echo ""
+    echo -e "${YELLOW}⚠  Requires func start running in another terminal${NC}"
+    echo ""
+
+    ACTUAL_STATUS=$(curl -s -o /tmp/qbis_api_resp.json -w "%{http_code}" \
+        -X GET "$BASE_URL/queues")
+
+    echo -e "${BOLD}─── VERIFICATION: TC-11 Get Queue Summaries ───${NC}"
+    echo -e "Request:  GET $BASE_URL/queues"
+    echo -e "Expected: HTTP 200, array containing queueName='$QUEUE'"
+
+    FOUND=$(python3 -c "
+import json
+try:
+    rows = json.load(open('/tmp/qbis_api_resp.json'))
+    match = next((r for r in rows if r.get('queueName') == '$QUEUE'), None)
+    if match:
+        print('FOUND:' + str(match.get('slaStatus','?')) + '/' + str(match.get('alertSeverity','?')))
+    else:
+        print('NOT_FOUND')
+except Exception as e:
+    print('ERROR:' + str(e))
+" 2>/dev/null)
+
+    echo -e "Actual:   HTTP $ACTUAL_STATUS — $FOUND"
+    if [ "$ACTUAL_STATUS" = "200" ] && [[ "$FOUND" == FOUND* ]]; then
+        local detail
+        detail=$(echo "$FOUND" | cut -d: -f2)
+        echo -e "${GREEN}${BOLD}✅ PASS — $QUEUE found in /api/queues response (slaStatus/alertSeverity: $detail)${NC}"
+    else
+        echo -e "${RED}${BOLD}❌ FAIL — HTTP=$ACTUAL_STATUS  lookup=$FOUND${NC}"
+    fi
+    echo ""
+    read -p "Press ENTER to return to menu..."
+}
+
+
+scenario_12_get_queue_history() {
+    echo ""
+    echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}${BLUE} TC-12: GET QUEUE HISTORY — FR-5.2.1${NC}"
+    echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "What:    GET /api/queues/{name}/history returns historical QueueStatus records"
+    echo -e "Expect:  HTTP 200, JSON array (may be empty if system just started)"
+    echo ""
+
+    ACTUAL_STATUS=$(curl -s -o /tmp/qbis_api_resp.json -w "%{http_code}" \
+        -X GET "$BASE_URL/queues/$QUEUE/history?minutes=60")
+
+    echo -e "${BOLD}─── VERIFICATION: TC-12 Get Queue History ───${NC}"
+    echo -e "Request:  GET $BASE_URL/queues/$QUEUE/history?minutes=60"
+    echo -e "Expected: HTTP 200, JSON array"
+
+    COUNT=$(python3 -c "
+import json
+try:
+    rows = json.load(open('/tmp/qbis_api_resp.json'))
+    print(str(len(rows)) + ' rows')
+except Exception as e:
+    print('ERROR:' + str(e))
+" 2>/dev/null)
+
+    echo -e "Actual:   HTTP $ACTUAL_STATUS — $COUNT"
+    if [ "$ACTUAL_STATUS" = "200" ]; then
+        echo -e "${GREEN}${BOLD}✅ PASS — HTTP 200, history endpoint returned ($COUNT)${NC}"
+    else
+        echo -e "${RED}${BOLD}❌ FAIL — HTTP=$ACTUAL_STATUS${NC}"
+    fi
+    echo ""
+    read -p "Press ENTER to return to menu..."
+}
+
+
+scenario_13_get_alert_history() {
+    echo ""
+    echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}${BLUE} TC-13: GET ALERT HISTORY — FR-5.3.1${NC}"
+    echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "What:    GET /api/queues/{name}/alerts returns incident and alert history records"
+    echo -e "Expect:  HTTP 200, JSON array"
+    echo ""
+
+    ACTUAL_STATUS=$(curl -s -o /tmp/qbis_api_resp.json -w "%{http_code}" \
+        -X GET "$BASE_URL/queues/$QUEUE/alerts")
+
+    echo -e "${BOLD}─── VERIFICATION: TC-13 Get Alert History ───${NC}"
+    echo -e "Request:  GET $BASE_URL/queues/$QUEUE/alerts"
+    echo -e "Expected: HTTP 200, JSON array"
+
+    COUNT=$(python3 -c "
+import json
+try:
+    rows = json.load(open('/tmp/qbis_api_resp.json'))
+    print(str(len(rows)) + ' alerts')
+except Exception as e:
+    print('ERROR:' + str(e))
+" 2>/dev/null)
+
+    echo -e "Actual:   HTTP $ACTUAL_STATUS — $COUNT"
+    if [ "$ACTUAL_STATUS" = "200" ]; then
+        echo -e "${GREEN}${BOLD}✅ PASS — HTTP 200, alert history endpoint returned ($COUNT)${NC}"
+    else
+        echo -e "${RED}${BOLD}❌ FAIL — HTTP=$ACTUAL_STATUS${NC}"
+    fi
+    echo ""
+    read -p "Press ENTER to return to menu..."
+}
+
+
+scenario_14_create_queue_config() {
+    echo ""
+    echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}${BLUE} TC-14: CREATE QUEUE CONFIGURATION — FR-4.1.1${NC}"
+    echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "What:    POST /api/queues creates a new queue config row in QueueConfig table"
+    echo -e "Expect:  HTTP 200, row exists in QueueConfig; cleanup DELETE runs at end"
+    echo ""
+
+    local TEST_QUEUE="tc14-test-queue"
+    local SUB_ID
+    SUB_ID=$(az account show --query id --output tsv 2>/dev/null)
+
+    # Build request body
+    cat > /tmp/qbis_tc14_body.json << JSONEOF
+{
+    "QueueName": "$TEST_QUEUE",
+    "Namespace": "$NAMESPACE",
+    "SubscriptionId": "$SUB_ID",
+    "ResourceGroupName": "$RESOURCE_GROUP",
+    "SlaMinutes": 10,
+    "IsEnabled": false,
+    "CooldownMinutes": 5,
+    "WarningThreshold": 0.7,
+    "CriticalThreshold": 1.0,
+    "TeamsWebhookUrl": null,
+    "EmailRecipients": null
+}
+JSONEOF
+
+    echo -e "${BOLD}─── VERIFICATION STEP 1: POST /api/queues ───${NC}"
+    echo -e "Request:  POST $BASE_URL/queues  (QueueName=$TEST_QUEUE)"
+    echo -e "Expected: HTTP 200"
+
+    ACTUAL_STATUS=$(curl -s -o /tmp/qbis_api_resp.json -w "%{http_code}" \
+        -X POST "$BASE_URL/queues" \
+        -H "Content-Type: application/json" \
+        -d @/tmp/qbis_tc14_body.json)
+
+    echo -e "Actual:   HTTP $ACTUAL_STATUS — $(cat /tmp/qbis_api_resp.json)"
+    if [ "$ACTUAL_STATUS" = "200" ]; then
+        echo -e "${GREEN}${BOLD}✅ PASS — HTTP 200 create accepted${NC}"
+    else
+        echo -e "${RED}${BOLD}❌ FAIL — HTTP=$ACTUAL_STATUS (is func start running?)${NC}"
+        read -p "Press ENTER to return to menu..."
+        return
+    fi
+
+    echo ""
+    echo -e "${BOLD}─── VERIFICATION STEP 2: Row exists in QueueConfig table ───${NC}"
+    ROW_EXISTS=$(az storage entity show \
+        --account-name "$STORAGE_ACCOUNT" \
+        --table-name QueueConfig \
+        --partition-key "config" \
+        --row-key "$TEST_QUEUE" \
+        --connection-string "$STORAGE_CONN" \
+        --output json 2>/dev/null | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    sla = d.get('SlaMinutes', {})
+    sla = sla.get('value', sla) if isinstance(sla, dict) else sla
+    print('FOUND:SlaMinutes=' + str(sla))
+except:
+    print('NOT_FOUND')
+")
+    echo -e "Expected: Row RowKey='$TEST_QUEUE' exists in QueueConfig (PartitionKey=config)"
+    echo -e "Actual:   $ROW_EXISTS"
+    if [[ "$ROW_EXISTS" == FOUND* ]]; then
+        echo -e "${GREEN}${BOLD}✅ PASS — QueueConfig row created ($ROW_EXISTS)${NC}"
+    else
+        echo -e "${RED}${BOLD}❌ FAIL — Row not found in QueueConfig table${NC}"
+    fi
+
+    echo ""
+    echo -e "${BOLD}─── CLEANUP: DELETE $TEST_QUEUE ───${NC}"
+    CLEANUP_STATUS=$(curl -s -o /tmp/qbis_api_resp.json -w "%{http_code}" \
+        -X DELETE "$BASE_URL/queues/$TEST_QUEUE")
+    echo -e "DELETE $BASE_URL/queues/$TEST_QUEUE → HTTP $CLEANUP_STATUS"
+    if [ "$CLEANUP_STATUS" = "200" ]; then
+        echo -e "${GREEN}Cleanup: test queue $TEST_QUEUE deleted${NC}"
+    else
+        echo -e "${RED}Cleanup FAILED — delete $TEST_QUEUE manually from QueueConfig table${NC}"
+    fi
+
+    echo ""
+    read -p "Press ENTER to return to menu..."
+}
+
+
+scenario_15_update_queue_config() {
+    echo ""
+    echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}${BLUE} TC-15: UPDATE QUEUE CONFIGURATION — FR-4.2.1${NC}"
+    echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "What:    PUT /api/queues/qbi-queue changes SlaMinutes, verifies in table, then restores"
+    echo -e "Expect:  HTTP 200 on PUT; SlaMinutes=99 in QueueConfig; original value restored"
+    echo ""
+
+    # Read current config from Table Storage
+    ENTITY=$(az storage entity show \
+        --account-name "$STORAGE_ACCOUNT" \
+        --table-name QueueConfig \
+        --partition-key "config" \
+        --row-key "$QUEUE" \
+        --connection-string "$STORAGE_CONN" \
+        --output json 2>/dev/null)
+
+    if [ -z "$ENTITY" ]; then
+        echo -e "${RED}Cannot read $QUEUE from QueueConfig table — aborting${NC}"
+        read -p "Press ENTER to return to menu..."
+        return
+    fi
+
+    # Helper: build PUT body from entity, overriding SlaMinutes with $1
+    build_put_body() {
+        local new_sla=$1
+        cat > /tmp/qbis_tc15_build.py << 'PYEOF'
+import json, sys
+
+entity = json.load(open('/tmp/qbis_tc15_entity.json'))
+
+def get_val(d, key, default=''):
+    v = d.get(key, default)
+    if isinstance(v, dict):
+        return v.get('value', default)
+    return v if v is not None else default
+
+import sys
+new_sla = int(sys.argv[1])
+
+body = {
+    'QueueName':         get_val(entity, 'QueueName'),
+    'Namespace':         get_val(entity, 'Namespace'),
+    'SubscriptionId':    get_val(entity, 'SubscriptionId'),
+    'ResourceGroupName': get_val(entity, 'ResourceGroupName'),
+    'SlaMinutes':        new_sla,
+    'IsEnabled':         bool(get_val(entity, 'IsEnabled', True)),
+    'CooldownMinutes':   int(get_val(entity, 'CooldownMinutes', 5)),
+    'WarningThreshold':  float(get_val(entity, 'WarningThreshold', 0.7)),
+    'CriticalThreshold': float(get_val(entity, 'CriticalThreshold', 1.0)),
+    'TeamsWebhookUrl':   get_val(entity, 'TeamsWebhookUrl') or None,
+    'EmailRecipients':   get_val(entity, 'EmailRecipients') or None,
+}
+print(json.dumps(body))
+PYEOF
+        echo "$ENTITY" > /tmp/qbis_tc15_entity.json
+        python3 /tmp/qbis_tc15_build.py "$new_sla"
+    }
+
+    ORIG_SLA=$(echo "$ENTITY" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+v = d.get('SlaMinutes', {})
+print(str(v.get('value', v) if isinstance(v, dict) else v))
+")
+    local NEW_SLA=99
+
+    echo -e "Current SlaMinutes in table: ${CYAN}$ORIG_SLA${NC} → changing to ${CYAN}$NEW_SLA${NC} for test"
+    echo ""
+
+    echo -e "${BOLD}─── VERIFICATION STEP 1: PUT /api/queues/$QUEUE (SlaMinutes→$NEW_SLA) ───${NC}"
+    UPDATE_BODY=$(build_put_body "$NEW_SLA")
+    ACTUAL_STATUS=$(curl -s -o /tmp/qbis_api_resp.json -w "%{http_code}" \
+        -X PUT "$BASE_URL/queues/$QUEUE" \
+        -H "Content-Type: application/json" \
+        -d "$UPDATE_BODY")
+    echo -e "Expected: HTTP 200"
+    echo -e "Actual:   HTTP $ACTUAL_STATUS — $(cat /tmp/qbis_api_resp.json)"
+    if [ "$ACTUAL_STATUS" = "200" ]; then
+        echo -e "${GREEN}${BOLD}✅ PASS — HTTP 200 update accepted${NC}"
+    else
+        echo -e "${RED}${BOLD}❌ FAIL — HTTP=$ACTUAL_STATUS${NC}"
+        read -p "Press ENTER to return to menu..."
+        return
+    fi
+
+    echo ""
+    echo -e "${BOLD}─── VERIFICATION STEP 2: SlaMinutes=$NEW_SLA in QueueConfig table ───${NC}"
+    UPDATED_SLA=$(az storage entity show \
+        --account-name "$STORAGE_ACCOUNT" \
+        --table-name QueueConfig \
+        --partition-key "config" \
+        --row-key "$QUEUE" \
+        --connection-string "$STORAGE_CONN" \
+        --output json 2>/dev/null | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+v = d.get('SlaMinutes', {})
+print(str(v.get('value', v) if isinstance(v, dict) else v))
+")
+    echo -e "Expected: SlaMinutes=$NEW_SLA"
+    echo -e "Actual:   SlaMinutes=$UPDATED_SLA"
+    if [ "$UPDATED_SLA" = "$NEW_SLA" ]; then
+        echo -e "${GREEN}${BOLD}✅ PASS — SlaMinutes updated to $NEW_SLA in table${NC}"
+    else
+        echo -e "${RED}${BOLD}❌ FAIL — SlaMinutes=$UPDATED_SLA (expected $NEW_SLA)${NC}"
+    fi
+
+    echo ""
+    echo -e "${BOLD}─── RESTORE: PUT /api/queues/$QUEUE (SlaMinutes→$ORIG_SLA) ───${NC}"
+    RESTORE_BODY=$(build_put_body "$ORIG_SLA")
+    RESTORE_STATUS=$(curl -s -o /tmp/qbis_api_resp.json -w "%{http_code}" \
+        -X PUT "$BASE_URL/queues/$QUEUE" \
+        -H "Content-Type: application/json" \
+        -d "$RESTORE_BODY")
+    echo -e "PUT SlaMinutes=$ORIG_SLA → HTTP $RESTORE_STATUS"
+    if [ "$RESTORE_STATUS" = "200" ]; then
+        echo -e "${GREEN}Restore: SlaMinutes returned to $ORIG_SLA${NC}"
+    else
+        echo -e "${RED}Restore FAILED (HTTP $RESTORE_STATUS) — SlaMinutes may still be $NEW_SLA; fix manually${NC}"
+    fi
+
+    echo ""
+    read -p "Press ENTER to return to menu..."
+}
+
+
+scenario_16_delete_queue_config() {
+    echo ""
+    echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}${BLUE} TC-16: DELETE QUEUE CONFIGURATION — FR-4.3.1${NC}"
+    echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "What:    Creates a temporary queue via POST, then deletes it via DELETE /api/queues/{name}"
+    echo -e "Expect:  HTTP 200 on DELETE; row absent from QueueConfig table"
+    echo ""
+
+    local TEST_QUEUE="tc16-delete-queue"
+    local SUB_ID
+    SUB_ID=$(az account show --query id --output tsv 2>/dev/null)
+
+    echo -e "${BOLD}─── SETUP: Create $TEST_QUEUE ───${NC}"
+    cat > /tmp/qbis_tc16_body.json << JSONEOF
+{
+    "QueueName": "$TEST_QUEUE",
+    "Namespace": "$NAMESPACE",
+    "SubscriptionId": "$SUB_ID",
+    "ResourceGroupName": "$RESOURCE_GROUP",
+    "SlaMinutes": 5,
+    "IsEnabled": false,
+    "CooldownMinutes": 5,
+    "WarningThreshold": 0.7,
+    "CriticalThreshold": 1.0,
+    "TeamsWebhookUrl": null,
+    "EmailRecipients": null
+}
+JSONEOF
+
+    SETUP_STATUS=$(curl -s -o /tmp/qbis_api_resp.json -w "%{http_code}" \
+        -X POST "$BASE_URL/queues" \
+        -H "Content-Type: application/json" \
+        -d @/tmp/qbis_tc16_body.json)
+    echo -e "POST /api/queues ($TEST_QUEUE) → HTTP $SETUP_STATUS"
+    if [ "$SETUP_STATUS" != "200" ]; then
+        echo -e "${RED}Setup FAILED (HTTP $SETUP_STATUS) — cannot proceed with delete test${NC}"
+        read -p "Press ENTER to return to menu..."
+        return
+    fi
+    echo -e "${GREEN}Setup: $TEST_QUEUE created in QueueConfig${NC}"
+
+    echo ""
+    echo -e "${BOLD}─── VERIFICATION STEP 1: DELETE /api/queues/$TEST_QUEUE ───${NC}"
+    ACTUAL_STATUS=$(curl -s -o /tmp/qbis_api_resp.json -w "%{http_code}" \
+        -X DELETE "$BASE_URL/queues/$TEST_QUEUE")
+    echo -e "Expected: HTTP 200"
+    echo -e "Actual:   HTTP $ACTUAL_STATUS — $(cat /tmp/qbis_api_resp.json)"
+    if [ "$ACTUAL_STATUS" = "200" ]; then
+        echo -e "${GREEN}${BOLD}✅ PASS — HTTP 200 delete accepted${NC}"
+    else
+        echo -e "${RED}${BOLD}❌ FAIL — HTTP=$ACTUAL_STATUS${NC}"
+        read -p "Press ENTER to return to menu..."
+        return
+    fi
+
+    echo ""
+    echo -e "${BOLD}─── VERIFICATION STEP 2: Row absent from QueueConfig table ───${NC}"
+    ROW_CHECK=$(az storage entity show \
+        --account-name "$STORAGE_ACCOUNT" \
+        --table-name QueueConfig \
+        --partition-key "config" \
+        --row-key "$TEST_QUEUE" \
+        --connection-string "$STORAGE_CONN" \
+        --output json 2>/dev/null | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print('STILL_EXISTS:' + d.get('RowKey', '?'))
+except:
+    print('GONE')
+")
+    echo -e "Expected: Row '$TEST_QUEUE' absent from QueueConfig (partition=config)"
+    echo -e "Actual:   $ROW_CHECK"
+    if [ "$ROW_CHECK" = "GONE" ]; then
+        echo -e "${GREEN}${BOLD}✅ PASS — Row deleted from QueueConfig table${NC}"
+    else
+        echo -e "${RED}${BOLD}❌ FAIL — $ROW_CHECK (row still present)${NC}"
+    fi
+
+    echo ""
+    read -p "Press ENTER to return to menu..."
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # MAIN MENU
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -894,6 +1318,14 @@ while true; do
     echo -e "  ${YELLOW}[10]${NC} TC-09: Burst Arrival on Empty Queue       (not ConsumerStopped)"
     echo -e "  ${BLUE}[11]${NC} TC-10: Full Lifecycle                      (complete incident story)"
     echo ""
+    echo -e "  ${CYAN}── Dashboard API ─────────────────────────────────────────────────${NC}"
+    echo -e "  ${GREEN}[12]${NC} TC-11: GET Queue Summaries                 (FR-5.1.1)"
+    echo -e "  ${GREEN}[13]${NC} TC-12: GET Queue History                   (FR-5.2.1)"
+    echo -e "  ${GREEN}[14]${NC} TC-13: GET Alert History                   (FR-5.3.1)"
+    echo -e "  ${YELLOW}[15]${NC} TC-14: Create Queue Configuration          (FR-4.1.1 — POST /api/queues)"
+    echo -e "  ${YELLOW}[16]${NC} TC-15: Update Queue Configuration          (FR-4.2.1 — PUT /api/queues/qbi-queue)"
+    echo -e "  ${RED}[17]${NC} TC-16: Delete Queue Configuration          (FR-4.3.1 — safe: creates + deletes test queue)"
+    echo ""
     echo -e "  ${CYAN}[c]${NC}  Check current data (last 15 rows)"
     echo -e "  ${CYAN}[p]${NC}  Purge queue"
     echo -e "  ${CYAN}[q]${NC}  Quit"
@@ -914,6 +1346,12 @@ while true; do
         9)  scenario_8_idle_stale ;;
         10) scenario_9_burst_arrival ;;
         11) scenario_10_full_lifecycle ;;
+        12) scenario_11_get_queue_summaries ;;
+        13) scenario_12_get_queue_history ;;
+        14) scenario_13_get_alert_history ;;
+        15) scenario_14_create_queue_config ;;
+        16) scenario_15_update_queue_config ;;
+        17) scenario_16_delete_queue_config ;;
         c|C) check_data 15 ; read -p "Press ENTER..." ;;
         p|P) purge_queue ; read -p "Press ENTER..." ;;
         q|Q)

@@ -14,8 +14,8 @@
 | **Branch**          | main                                                                   |
 | **Commit SHA**      | dda88ab (v1.4.1)                                                       |
 | **Release Version** | v1.4.1                                                                 |
-| **Document Version**| v1.1                                                                   |
-| **Last Updated**    | 2026-07-21                                                             |
+| **Document Version**| v1.2                                                                   |
+| **Last Updated**    | 2026-07-22                                                             |
 
 ---
 
@@ -25,6 +25,7 @@
 |---------|------------|------------|---------------------------|---------------|
 | v1.0    | 2026-07-21 | dda88ab    | Initial test plan created | Shweta Patel  |
 | v1.1    | 2026-07-22 | 4e46edb    | Fixed three factual errors: (A) storage table count 3→4 (QueueConfig added); (B) Traceability Matrix FR IDs realigned to PRD v1.2 exactly; (C) Collector cadence corrected from "every 30 seconds" to "every 60 seconds". | Shweta Patel  |
+| v1.2    | 2026-07-22 | —          | Added TC-11 through TC-16 (curl-based API scenarios for FR-4.x.x and FR-5.x.x); updated Traceability Matrix, Coverage Analysis, and Open Issues accordingly. | Shweta Patel  |
 
 ---
 
@@ -88,6 +89,7 @@ This document covers manual black-box testing of the QBIS backend analysis pipel
 | False-positive prevention | Burst arrival on empty queue must not trigger `ConsumerStopped` |
 | DLQ detection | `DLQGrowth` root cause when active queue is empty |
 | Full incident lifecycle | Open → escalate → recover → resolve |
+| Dashboard REST API | All six HTTP endpoints: `GET /api/queues`, `GET /api/queues/{name}/history`, `GET /api/queues/{name}/alerts`, `POST /api/queues`, `PUT /api/queues/{name}`, `DELETE /api/queues/{name}` |
 
 ### 2.2 Out of Scope
 
@@ -242,6 +244,12 @@ Each test run creates a timestamped directory under `backend/Tests/TestResults/Y
 | TC-08 | Idle Queue with Stale Messages | `scenario_8_idle_stale` |
 | TC-09 | Burst Arrival on Empty Queue | `scenario_9_burst_arrival` |
 | TC-10 | Full Lifecycle | `scenario_10_full_lifecycle` |
+| TC-11 | GET Queue Summaries | `scenario_11_get_queue_summaries` |
+| TC-12 | GET Queue History | `scenario_12_get_queue_history` |
+| TC-13 | GET Alert History | `scenario_13_get_alert_history` |
+| TC-14 | Create Queue Configuration | `scenario_14_create_queue_config` |
+| TC-15 | Update Queue Configuration | `scenario_15_update_queue_config` |
+| TC-16 | Delete Queue Configuration | `scenario_16_delete_queue_config` |
 
 ---
 
@@ -371,6 +379,84 @@ Each test run creates a timestamped directory under `backend/Tests/TestResults/Y
 
 ---
 
+### TC-11 — GET Queue Summaries
+
+| Field | Value |
+|-------|-------|
+| **Objective** | Verify `GET /api/queues` returns HTTP 200 and a JSON array containing the configured queue |
+| **Precondition** | `func start` running; `qbi-queue` row exists in `QueueConfig` table |
+| **Steps** | 1. `curl -s -o resp.json -w "%{http_code}" GET http://localhost:7071/api/queues`. 2. Assert HTTP 200. 3. Assert response array contains an object with `queueName="qbi-queue"`. |
+| **Expected Result** | HTTP 200; array includes `{ queueName: "qbi-queue", slaStatus: "OK"\|"BREACHING"\|"UNKNOWN", alertSeverity: "None"\|"Warning"\|"Critical" }` |
+| **Assertions** | `ACTUAL_STATUS=200` AND `FOUND=FOUND:*` |
+| **Covers** | FR-5.1.1 |
+
+---
+
+### TC-12 — GET Queue History
+
+| Field | Value |
+|-------|-------|
+| **Objective** | Verify `GET /api/queues/{name}/history` returns HTTP 200 and a JSON array |
+| **Precondition** | `func start` running; at least one `QueueStatus` row exists for `qbi-queue` |
+| **Steps** | 1. `curl -s GET http://localhost:7071/api/queues/qbi-queue/history?minutes=60`. 2. Assert HTTP 200. 3. Parse response as JSON array. |
+| **Expected Result** | HTTP 200; JSON array (may be empty if system just started; non-empty after any analysis cycle) |
+| **Assertions** | `ACTUAL_STATUS=200` |
+| **Covers** | FR-5.2.1 |
+
+---
+
+### TC-13 — GET Alert History
+
+| Field | Value |
+|-------|-------|
+| **Objective** | Verify `GET /api/queues/{name}/alerts` returns HTTP 200 and a JSON array |
+| **Precondition** | `func start` running; `qbi-queue` configured |
+| **Steps** | 1. `curl -s GET http://localhost:7071/api/queues/qbi-queue/alerts`. 2. Assert HTTP 200. 3. Parse response as JSON array. |
+| **Expected Result** | HTTP 200; JSON array (empty if no incidents occurred; non-empty after any TC-02/TC-10 run) |
+| **Assertions** | `ACTUAL_STATUS=200` |
+| **Covers** | FR-5.3.1 |
+
+---
+
+### TC-14 — Create Queue Configuration
+
+| Field | Value |
+|-------|-------|
+| **Objective** | Verify `POST /api/queues` creates a new row in the `QueueConfig` table and returns HTTP 200 |
+| **Precondition** | `func start` running; `tc14-test-queue` does not already exist in `QueueConfig` |
+| **Steps** | 1. `curl -X POST /api/queues` with body `{ "QueueName": "tc14-test-queue", "Namespace": "qbi-sb-ns", "SlaMinutes": 10, "IsEnabled": false, … }`. 2. Assert HTTP 200. 3. `az storage entity show --table-name QueueConfig --partition-key config --row-key tc14-test-queue`. 4. Assert row exists with `SlaMinutes=10`. 5. Cleanup: `DELETE /api/queues/tc14-test-queue`. |
+| **Expected Result** | HTTP 200 with `{ "message": "Queue 'tc14-test-queue' created" }`; row present in `QueueConfig` table; cleanup DELETE returns HTTP 200 |
+| **Assertions** | POST HTTP 200 AND `ROW_EXISTS=FOUND:SlaMinutes=10` |
+| **Covers** | FR-4.1.1 |
+
+---
+
+### TC-15 — Update Queue Configuration
+
+| Field | Value |
+|-------|-------|
+| **Objective** | Verify `PUT /api/queues/qbi-queue` updates the `SlaMinutes` field in `QueueConfig` and returns HTTP 200; original value is restored after test |
+| **Precondition** | `func start` running; `qbi-queue` row exists in `QueueConfig` |
+| **Steps** | 1. Read current `SlaMinutes` from `QueueConfig` table via `az storage entity show`. 2. `curl -X PUT /api/queues/qbi-queue` with full body and `SlaMinutes=99`. 3. Assert HTTP 200. 4. `az storage entity show` — assert `SlaMinutes=99`. 5. Restore: `curl -X PUT` with original `SlaMinutes`. Assert HTTP 200. |
+| **Expected Result** | First PUT: HTTP 200; `QueueConfig.SlaMinutes=99`. Restore PUT: HTTP 200; `QueueConfig.SlaMinutes` reverted to original value |
+| **Assertions** | PUT HTTP 200 AND `UPDATED_SLA=99` |
+| **Covers** | FR-4.2.1 |
+
+---
+
+### TC-16 — Delete Queue Configuration
+
+| Field | Value |
+|-------|-------|
+| **Objective** | Verify `DELETE /api/queues/{name}` removes the row from `QueueConfig` and returns HTTP 200 |
+| **Precondition** | `func start` running; test uses a temporary `tc16-delete-queue` (not the live `qbi-queue`) |
+| **Steps** | 1. Setup: `POST /api/queues` to create `tc16-delete-queue`. Assert HTTP 200. 2. `curl -X DELETE /api/queues/tc16-delete-queue`. 3. Assert HTTP 200. 4. `az storage entity show --row-key tc16-delete-queue` — assert row is gone (exit code 1 / empty output). |
+| **Expected Result** | DELETE returns HTTP 200 with `{ "message": "Queue 'tc16-delete-queue' deleted" }`; `az storage entity show` finds no row |
+| **Assertions** | DELETE HTTP 200 AND `ROW_CHECK=GONE` |
+| **Covers** | FR-4.3.1 |
+
+---
+
 ## 8. Test Execution Schedule
 
 | Run Date | Folder | Scenarios Executed |
@@ -401,17 +487,17 @@ FR IDs and Level-2 Capability names are taken directly from PRD v1.2, Section 9.
 | FR-3.1.1 | Determine alert severity | The Alert Service shall assign an alert severity of None, Warning, or Critical for each computed queue status. | TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08, TC-09, TC-10 |
 | FR-3.2.1 | Dispatch Teams notifications | The Alert Service shall send a Teams webhook notification when an incident requires alert dispatch. | Verified via `AlertRecord` artifacts; not separately scenario-tested |
 | FR-3.3.1 | Dispatch email notifications | The Alert Service shall send an SMTP email notification when email recipients are configured for the queue. | Out of scope — requires live SMTP credentials not present in test environment |
-| FR-4.1.1 | Create queue configuration | The Dashboard Function shall accept a queue configuration request and create a new monitored queue record. | Not scenario-tested |
-| FR-4.2.1 | Update queue configuration | The Dashboard Function shall update an existing queue configuration record when the user submits a valid configuration change. | Not scenario-tested |
-| FR-4.3.1 | Delete queue configuration | The Dashboard Function shall delete a monitored queue configuration record when the user issues a delete request. | Not scenario-tested |
-| FR-5.1.1 | Return queue summaries | The Dashboard Function shall return a current queue summary response containing the queue status for all monitored queues. | Not scenario-tested |
-| FR-5.2.1 | Return queue history | The Dashboard Function shall return historical status records for a specific queue over a requested range. | Not scenario-tested |
-| FR-5.3.1 | Return alert history | The Dashboard Function shall return incident and alert history records for a queue from the AlertRecord table. | Not scenario-tested |
-| FR-6.1.1 | Purge old snapshots | The Cleanup Function shall purge QueueSnapshot rows older than the configured retention window. | Not scenario-tested |
-| FR-6.2.1 | Purge old status records | The Cleanup Function shall purge QueueStatus rows older than the configured retention window. | Not scenario-tested |
-| FR-6.3.1 | Purge old alert records | The Cleanup Function shall purge AlertRecord rows older than the configured retention window. | Not scenario-tested |
-| FR-7.1.1 | Protect API access through Azure AD Easy Auth | The backend API shall require Azure AD Easy Auth protection in production environments. | Not scenario-tested (Azure-only infrastructure feature) |
-| FR-7.2.1 | Allow frontend token-based access | The frontend shall provide a token acquisition flow that allows authenticated API requests. | Not scenario-tested; MSAL bypass (`VITE_AUTH_ENABLED=false`) implicitly exercised by all local dev runs |
+| FR-4.1.1 | Create queue configuration | The Dashboard Function shall accept a queue configuration request and create a new monitored queue record. | TC-14 |
+| FR-4.2.1 | Update queue configuration | The Dashboard Function shall update an existing queue configuration record when the user submits a valid configuration change. | TC-15 |
+| FR-4.3.1 | Delete queue configuration | The Dashboard Function shall delete a monitored queue configuration record when the user issues a delete request. | TC-16 |
+| FR-5.1.1 | Return queue summaries | The Dashboard Function shall return a current queue summary response containing the queue status for all monitored queues. | TC-11 |
+| FR-5.2.1 | Return queue history | The Dashboard Function shall return historical status records for a specific queue over a requested range. | TC-12 |
+| FR-5.3.1 | Return alert history | The Dashboard Function shall return incident and alert history records for a queue from the AlertRecord table. | TC-13 |
+| FR-6.1.1 | Purge old snapshots | The Cleanup Function shall purge QueueSnapshot rows older than the configured retention window. | Not scenario-tested — requires data older than the retention window to exist; exercised implicitly by data aging in Table Storage over 24+ hours |
+| FR-6.2.1 | Purge old status records | The Cleanup Function shall purge QueueStatus rows older than the configured retention window. | Not scenario-tested — same constraint as FR-6.1.1; no scripted assertion defined |
+| FR-6.3.1 | Purge old alert records | The Cleanup Function shall purge AlertRecord rows older than the configured retention window. | Not scenario-tested — same constraint as FR-6.1.1; no scripted assertion defined |
+| FR-7.1.1 | Protect API access through Azure AD Easy Auth | The backend API shall require Azure AD Easy Auth protection in production environments. | Not scenario-tested in local dev — verified manually in Azure production: valid Bearer token → HTTP 200; missing token → HTTP 401 (documented in Risk Report R8, verified during v1.3.0 deployment) |
+| FR-7.2.1 | Allow frontend token-based access | The frontend shall provide a token acquisition flow that allows authenticated API requests. | Not scenario-tested — MSAL `loginRedirect` / `acquireTokenRedirect` flow exercised in all browser sessions against Azure; local dev bypass (`VITE_AUTH_ENABLED=false`) implicitly exercised by all local test runs |
 
 ---
 
@@ -577,11 +663,11 @@ No TestResults run was required for this fix as it affected navigation only, not
 | Collect Queue Metrics | FR-1.x.x | 3 | 1 (FR-1.1.1) | 33% |
 | Analyze Queue Health | FR-2.x.x | 3 | 3 (FR-2.1.1, FR-2.2.1, FR-2.3.1) | 100% |
 | Manage Alerting | FR-3.x.x | 3 | 1 (FR-3.1.1) | 33% |
-| Manage Queue Configurations | FR-4.x.x | 3 | 0 | 0% |
-| Expose Dashboard Data | FR-5.x.x | 3 | 0 | 0% |
+| Manage Queue Configurations | FR-4.x.x | 3 | 3 (TC-14, TC-15, TC-16) | 100% |
+| Expose Dashboard Data | FR-5.x.x | 3 | 3 (TC-11, TC-12, TC-13) | 100% |
 | Retain Operational Data | FR-6.x.x | 3 | 0 | 0% |
 | Authenticate Access | FR-7.x.x | 2 | 0 | 0% |
-| **Total** | | **20** | **5** | **25%** |
+| **Total** | | **20** | **11** | **55%** |
 
 ### 15.2 Root Cause Coverage
 
@@ -609,11 +695,11 @@ The following are not covered by any test scenario:
 - `ConsumerSlowdown` root cause
 - `ProducerSpikeAndConsumerSlowdown` root cause
 - Direct `Warning` severity assertion
-- Dashboard REST API endpoints (`/queues`, `/status`, `/history`, `/alerts`, `/health`, `/version`)
+- `GET /api/queues/{name}/status` and `GET /api/health` endpoints (functional but not separately asserted; health endpoint exercised by Sidebar polling during browser sessions)
 - Frontend rendering (Overview, Queue Detail, Sidebar, Settings pages)
-- Teams webhook delivery
-- Email alert delivery
-- CleanupFunction retention enforcement
+- Teams webhook delivery (verified observationally during v1.1.0 deployment; not scripted)
+- Email alert delivery (requires live SMTP credentials; excluded from test environment)
+- CleanupFunction retention enforcement (requires 24-hour real-time wait; no short-TTL test environment available)
 
 ---
 
@@ -626,7 +712,7 @@ The following are not covered by any test scenario:
 | **Repeatability** | High — each scenario starts from a known-empty queue and uses time-bound waits |
 | **Observability** | High — every assertion prints `Expected:` and `Actual:` field values; all runs are logged |
 | **Independence** | High — `purge_queue()` at the start of each scenario prevents state leakage |
-| **Completeness** | Partial — 9 of 11 scenarios have assertions; 5 of 20 FRs are directly covered |
+| **Completeness** | Partial — 15 of 17 scenarios have assertions; 11 of 20 FRs are directly covered (55%) |
 | **Automation** | Low — no automated execution; all scenarios require a human operator |
 
 ### 16.2 Product Quality
@@ -696,8 +782,8 @@ Each JSON artifact captures up to 20 rows from `QueueSnapshot`, `QueueStatus`, a
 | OI-02 | TC-05 and TC-06 have assertions added in v1.1.1 but no formal assertion run is captured — next execution will produce the first formal PASS/FAIL records | Medium |
 | OI-03 | TC-09 and TC-10 assertion added in v1.1.1 but no TestResults run exists — dedicated execution needed | Medium |
 | OI-04 | `ConsumerSlowdown` and `ProducerSpikeAndConsumerSlowdown` root causes have no test scenarios — behavior is untested | Medium |
-| OI-05 | Dashboard API endpoints (`GET /queues`, `/status`, `/history`, `/alerts`, `/health`, `/version`) have no automated test coverage | Low |
-| OI-06 | CleanupFunction has no manual test scenario — verification requires a 24-hour real-time wait or a dedicated short-TTL test environment | Low |
+| OI-05 | CleanupFunction has no manual test scenario — verification requires a 24-hour real-time wait or a dedicated short-TTL test environment | Low |
+| OI-06 | TC-11 through TC-16 (API scenarios) have not yet been executed — dedicated first runs needed to produce PASS/FAIL records in `TestResults/` | Medium |
 
 ---
 
