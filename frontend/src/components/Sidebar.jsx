@@ -1,7 +1,21 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useMsal } from '@azure/msal-react'
 import { useFetch } from '../hooks'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:7071/api'
+const AUTH_ENABLED = import.meta.env.VITE_AUTH_ENABLED === 'true'
+
+function SignOutButton() {
+  const { instance } = useMsal()
+  return (
+    <button
+      onClick={() => instance.logoutRedirect()}
+      className="w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+    >
+      Sign out
+    </button>
+  )
+}
 
 const NAV = [
   { to: '/',         label: 'Overview',  exact: true },
@@ -55,6 +69,13 @@ export default function Sidebar() {
           )
         })}
       </nav>
+
+      {/* Sign out */}
+      {AUTH_ENABLED && (
+        <div className="px-3 pb-2">
+          <SignOutButton />
+        </div>
+      )}
 
       {/* Backend health */}
       <div className="px-5 py-4 border-t border-white/10">
