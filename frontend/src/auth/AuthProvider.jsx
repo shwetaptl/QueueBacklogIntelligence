@@ -5,7 +5,7 @@ import { msalInstance, loginRequest } from './msalConfig'
 const AUTH_ENABLED = import.meta.env.VITE_AUTH_ENABLED === 'true'
 
 function LoginGate({ children }) {
-  const { instance } = useMsal()
+  const { instance, inProgress } = useMsal()
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -27,7 +27,9 @@ function LoginGate({ children }) {
       </AuthenticatedTemplate>
 
       <UnauthenticatedTemplate>
-        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        {/* inProgress !== 'none' means a redirect is in flight (login or logout).
+            Suppress the login page during that window to prevent a visible flash. */}
+        {inProgress === 'none' && <div className="min-h-screen bg-gray-900 flex items-center justify-center">
           <div className="bg-white rounded-2xl shadow-2xl p-10 w-full max-w-sm text-center">
             <div className="w-14 h-14 bg-blue-500 rounded-xl flex items-center justify-center mx-auto mb-5">
               <svg viewBox="0 0 20 20" fill="white" className="w-7 h-7">
@@ -67,7 +69,7 @@ function LoginGate({ children }) {
               Sign in with your organisation account to continue.
             </p>
           </div>
-        </div>
+        </div>}
       </UnauthenticatedTemplate>
     </>
   )
