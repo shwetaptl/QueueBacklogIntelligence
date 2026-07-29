@@ -14,8 +14,8 @@
 | **Branch**          | main                                                                   |
 | **Commit SHA**      | dda88ab (v1.4.1)                                                       |
 | **Release Version** | v1.4.1                                                                 |
-| **Document Version**| v1.2                                                                   |
-| **Last Updated**    | 2026-07-22                                                             |
+| **Document Version**| v1.3                                                                   |
+| **Last Updated**    | 2026-07-28                                                             |
 
 ---
 
@@ -26,6 +26,7 @@
 | v1.0    | 2026-07-21 | dda88ab    | Initial test plan created | Shweta Patel  |
 | v1.1    | 2026-07-22 | 4e46edb    | Fixed three factual errors: (A) storage table count 3→4 (QueueConfig added); (B) Traceability Matrix FR IDs realigned to PRD v1.2 exactly; (C) Collector cadence corrected from "every 30 seconds" to "every 60 seconds". | Shweta Patel  |
 | v1.2    | 2026-07-22 | —          | Added TC-11 through TC-16 (curl-based API scenarios for FR-4.x.x and FR-5.x.x); updated Traceability Matrix, Coverage Analysis, and Open Issues accordingly. | Shweta Patel  |
+| v1.3    | 2026-07-28 | —          | Added Section 17 Risk-Mitigation Matrix mapping R1–R8 to PRD UE IDs, mitigating FRs, and test scenarios; renumbered Sections 17–22 accordingly. | Shweta Patel  |
 
 ---
 
@@ -47,11 +48,12 @@
 14. [Regression Testing](#14-regression-testing)
 15. [Test Coverage Analysis](#15-test-coverage-analysis)
 16. [Quality Assessment](#16-quality-assessment)
-17. [Risks and Mitigations](#17-risks-and-mitigations)
-18. [Assumptions and Constraints](#18-assumptions-and-constraints)
-19. [Test Artifacts](#19-test-artifacts)
-20. [Open Issues](#20-open-issues)
-21. [Glossary](#21-glossary)
+17. [Risk-Mitigation Matrix](#17-risk-mitigation-matrix)
+18. [Risks and Mitigations](#18-risks-and-mitigations)
+19. [Assumptions and Constraints](#19-assumptions-and-constraints)
+20. [Test Artifacts](#20-test-artifacts)
+21. [Open Issues](#21-open-issues)
+22. [Glossary](#22-glossary)
 
 ---
 
@@ -642,7 +644,7 @@ Actual:   Trend=Idle SLA=OK Severity=None Cause=Healthy (Active=2)
 
 ### 14.2 TC-07 Regression (DLQ-BUG-01, DLQ-BUG-02)
 
-No formal post-fix TestResults run was captured for TC-07. The fix was verified by code inspection of `AnalyzerService.cs` after commit `0ac6bf3`. A dedicated post-fix regression run for TC-07 is identified as an open gap (see Section 20).
+No formal post-fix TestResults run was captured for TC-07. The fix was verified by code inspection of `AnalyzerService.cs` after commit `0ac6bf3`. A dedicated post-fix regression run for TC-07 is identified as an open gap (see Section 21).
 
 ### 14.3 Test Script Regression (v1.4.0 menu fix)
 
@@ -723,19 +725,46 @@ The two observational scenarios (TC-05 Recovery, TC-06 Slow Drain) produced corr
 
 ---
 
-## 17. Risks and Mitigations
+## 17. Risk-Mitigation Matrix
+
+This section provides explicit cross-document traceability from each risk in the Risk Management Report through the PRD Undesirable Event, the mitigating Functional Requirement(s), and the test scenario(s) that verify the mitigation is effective. R4 (Dashboard scope creep) has no PRD UE or FR because it is a project-management risk, not a product-behavior risk.
+
+| Risk ID | Risk Name | PRD UE | Risk Mitigation Strategy (PRD §7) | Mitigating FR(s) | Test Scenario(s) | Testing Status |
+|---------|-----------|--------|----------------------------------|-----------------|-----------------|----------------|
+| **R1** | Azure Monitor ingestion delay causes incorrect state classification | UE-1.2-01 | Use Service Bus Admin API as primary ground truth; treat Azure Monitor as secondary with consistency check and 3-snapshot weighted smoothing | FR-1.2.1, FR-2.2.1, FR-2.3.1 | Transitively: TC-01–TC-10 (all assert `SlaStatus` and `RootCause`); TC-09 guards false-positive from Monitor lag | **Partial** — behavioural mitigation verified across all scenarios; Monitor fallback path not directly asserted in isolation |
+| **R2** *(RETIRED)* | Division-by-zero in wait time formula | UE-2.3-01 | Conservative wait-time behaviour: return `null`/BREACHING for `ConsumerStopped`; return `0`/OK for Idle; no division performed | FR-2.3.1 | TC-01 (Idle → OK, wait=0), TC-02 (ConsumerStopped → BREACHING, wait=null), TC-08 (Idle stale → OK) | **Addressed** — R2 RETIRED in v1.3.3; FR-2.3.1 covered across all pipeline scenarios; fix verified by TC-08 regression |
+| **R3** | Teams webhook payload silently rejected | UE-3.2-01 | Runtime format detection by URL pattern; parse HTTP response body on every call; preserve `NeedToSendAlert` flag on failure for retry | FR-3.2.1 | `AlertRecord` artifacts confirm dispatch in TC-02, TC-10 runs; no scripted curl assertion against Teams | **Gap** — FR-3.2.1 verified observationally via `AlertRecord` table; no pass/fail assertion for webhook response body |
+| **R4** | Dashboard scope creep extends development beyond planned scope | *(none)* | Component scope lock to five approved components; GitHub Issues with `scope-change` label; feature freeze applied at v1.2.0 | *(none)* | N/A — process / project-management risk | **Acceptable** — no product-level FR; scope boundary held through v1.4.1; risk score 1×2=2 at Week 11 |
+| **R5** | Teams webhook URL pattern detection brittle | UE-3.2-01 | `DetectWebhookFormat()` isolated in single method; response body logging on every call; health-check warning on consecutive failures | FR-3.2.1 | Same as R3 — `AlertRecord` artifacts; no direct scripted assertion | **Gap** — same gap as R3; URL pattern detection logic not directly scenario-tested |
+| **R6** | New queue shows UNKNOWN state for first 1–2 cycles | UE-2.3-01 | `AlertSeverity=None` when `SlaStatus=UNKNOWN`; `NeedToSendAlert=false` during initialisation; dashboard displays UNKNOWN distinctly | FR-2.3.1 | TC-01–TC-10 (all handle `SlaStatus` including `UNKNOWN`); no TC specifically observing the 1–2 cycle initialisation window | **Partial** — steady-state OK/BREACHING fully covered; the UNKNOWN-to-computed transition window is not directly asserted |
+| **R7** | Dashboard 30s polling delay during fast-moving incidents | UE-5.1-01 | `lastUpdatedUtc` timestamp displayed; Sidebar health dot turns red when `analyzerDelayMinutes > 3`; polling interval is a known and documented limitation (L-01) | FR-5.1.1 | TC-11 (`GET /api/queues` → HTTP 200, `queueName` present in array) | **Partial** — endpoint existence and response shape verified; `lastUpdatedUtc` age / data freshness not asserted |
+| **R8** | Azure AD Easy Auth failure blocks or exposes production API | UE-7.1-01 | Authentication enforced at Azure Functions host layer; validated in production with valid and invalid tokens; local dev bypass via `VITE_AUTH_ENABLED=false` | FR-7.1.1, FR-7.2.1 | Manual production verification: valid Bearer token → HTTP 200 ✅; missing token → HTTP 401 ✅ (v1.3.0 deployment, documented in Risk Report R8) | **Acceptable** — Azure-only infrastructure feature; scripted local test not feasible; production verification documented |
+
+### 17.1 Gap Summary
+
+| Category | Risks | Impact | Path to Close |
+|----------|-------|--------|--------------|
+| **Gap — no scripted assertion** | R3, R5 (FR-3.2.1) | Teams alerts verified by artifact only; a bad payload format would not be caught by automated TC | Add a TC that sends an alert-triggering scenario (e.g. TC-02 rerun) and explicitly queries `AlertRecord` for the expected `AlertType` and parses the Teams response body log |
+| **Partial — transitive only** | R1 (FR-1.2.1) | Azure Monitor fallback behaviour is exercised but not isolated | Add a TC that injects a null Monitor metric (by running during a Monitor-unavailable window) and asserts `SlaStatus ≠ UNKNOWN` due to Admin API fallback |
+| **Partial — initialisation window** | R6 (FR-2.3.1) | First 1–2 cycles after queue creation produce UNKNOWN; not directly observed | Add a TC that queries `QueueStatus` within 60 s of a queue being created and asserts `AlertSeverity=None` during the UNKNOWN window |
+| **Partial — freshness not asserted** | R7 (FR-5.1.1) | TC-11 checks shape but not data age | Extend TC-11 to assert `lastUpdatedUtc` is within 90 s of the test execution time |
+| **Acceptable** | R2 (retired), R4 (process), R8 (Azure-only) | No actionable test gap | No further action required |
+
+---
+
+## 18. Risks and Mitigations
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|-----------|
 | Azure Monitor 2–4 minute delay causes TC-09 to intermittently fail | Medium | Medium | `queueWasRecentlyEmpty` guard in `AnalyzerService`; 3-snapshot smoothed average filters noise (L-07) |
-| TC-07 post-fix regression not captured | Medium | Low | Code inspection of commit `0ac6bf3` confirms fix; dedicated re-run is identified in Section 20 |
+| TC-07 post-fix regression not captured | Medium | Low | Code inspection of commit `0ac6bf3` confirms fix; dedicated re-run is identified in Section 21 |
 | TC-05 and TC-06 lack formal assertions in captured runs | Low | Medium | Assertions added in v1.1.1; future runs will capture them |
 | Single-snapshot `Recovering` state missed by TC-05 assertion | Low | Low | Documented as L-08; TC-05 asserts final stable state, not transient |
 | Teams webhook URL pattern change breaks format detection | Low | High | Documented as L-09; `AlertService` URL-based detection is a known design limitation |
 
 ---
 
-## 18. Assumptions and Constraints
+## 19. Assumptions and Constraints
 
 ### 18.1 Assumptions
 
@@ -755,7 +784,7 @@ The two observational scenarios (TC-05 Recovery, TC-06 Slow Drain) produced corr
 
 ---
 
-## 19. Test Artifacts
+## 20. Test Artifacts
 
 All test artifacts are committed to the repository under `backend/Tests/TestResults/`.
 
@@ -774,7 +803,7 @@ Each JSON artifact captures up to 20 rows from `QueueSnapshot`, `QueueStatus`, a
 
 ---
 
-## 20. Open Issues
+## 21. Open Issues
 
 | ID | Description | Priority |
 |----|-------------|----------|
@@ -787,7 +816,7 @@ Each JSON artifact captures up to 20 rows from `QueueSnapshot`, `QueueStatus`, a
 
 ---
 
-## 21. Glossary
+## 22. Glossary
 
 | Term | Definition |
 |------|-----------|
