@@ -164,7 +164,7 @@ The React app calls `/api/...` — nginx forwards to the Azure Functions contain
 ## Key Design Decisions
 
 **Why Azure Table Storage instead of SQL?**
-Table Storage is serverless, scales infinitely, costs near-zero for this workload, and the reverse-timestamp RowKey pattern makes latest-row lookups O(1).
+Table Storage is serverless, scales infinitely, and costs near-zero for this workload. The reverse-timestamp RowKey pattern ensures the most-recent row sorts first within a partition, so a `$top=1` query on a known PartitionKey seeks to the head of the partition's sorted index and returns without scanning the remaining rows. Lookup latency is therefore bounded by a single index seek rather than by the number of rows stored in the partition — a property of Azure Table Storage's sorted-key partition model, not a formally measured O(1) guarantee.
 
 **Why isolated worker model for Azure Functions?**
 The isolated worker runs in a separate process from the Functions host, giving full control over the .NET runtime version and dependency injection without host constraints.
