@@ -10,8 +10,8 @@
 - Current Branch: main
 - Current Commit SHA: 74e9f743fbe37fd6f0eafde1c926ac6bb5d317fe
 - Current Release Version: v1.4.1
-- Document Version: v1.2
-- Last Updated: 2026-07-21
+- Document Version: v1.3
+- Last Updated: 2026-08-06
 
 ---
 
@@ -22,12 +22,13 @@
 | v1.0 | 2026-07-21 | 9e37977e5a0a8517884b81e37c3ee480b76dfde1 | Initial PRD creation aligned to repository evidence for the current QBIS implementation. | Shweta Patel |
 | v1.1 | 2026-07-21 | 74e9f743fbe37fd6f0eafde1c926ac6bb5d317fe | Updated cover page (student name, commit SHA, release version v1.4.1, document version); resolved stakeholder and author To Be Completed items traceable from the repository. | Shweta Patel |
 | v1.2 | 2026-07-21 | 082d3dc | Added Section 8 Preventative Requirements (Q2 explicit layer); renumbered subsequent sections 8–17 to 9–18. | Shweta Patel |
+| v1.3 | 2026-08-06 | — | Added Section 1.5 Comparative Positioning — qualitative benchmark of QBIS 9-step pipeline against Azure Monitor built-in metric alerts and a naive threshold-only custom checker across eight operational scenarios. | Shweta Patel |
 
 ---
 
 ## Table of Contents
 
-1. [Product Vision](#1-product-vision)
+1. [Product Vision](#1-product-vision) _(includes §1.5 Comparative Positioning)_
 2. [Product Scope](#2-product-scope)
 3. [Software Capabilities](#3-software-capabilities)
 4. [Undesirable Events](#4-undesirable-events)
@@ -88,7 +89,59 @@ When a Service Bus queue backs up, on-call engineers need an immediate answer to
 
 - Current release in repository: v1.4.1
 - Prior documented release history exists in [CHANGELOG.md](../CHANGELOG.md)
-- Future versions are described in Section 15 and are subject to change
+- Future versions are described in Section 17 and are subject to change
+
+## Comparative Positioning
+
+This section establishes why QBIS uses a 9-step deterministic pipeline rather than one of two simpler alternatives an operations team might reach for first. The comparison is qualitative and grounded in the specific failure modes that motivated each design decision.
+
+### Baseline A — Azure Monitor Built-in Metric Alerts
+
+Azure Monitor allows a rule such as "alert when `ActiveMessages > 500` for 5 minutes." This is the lowest-effort monitoring option, requiring no custom code.
+
+**What it provides:**
+- A single threshold alert when a count crosses a configured value
+- Configurable severity (Sev 0–4) and action groups for notification routing
+
+**What it cannot do:**
+- Cannot distinguish *why* the count crossed the threshold (consumer stopped vs. producer spike vs. DLQ overflow)
+- Fires 2–4 minutes after the event due to Azure Monitor ingestion delay; QBIS uses the Service Bus Administration API directly, which reflects the current active count in near real-time
+- Cannot detect DLQ growth when `ActiveMessageCount` is zero — a queue where all messages have expired to DLQ appears healthy to a count-threshold rule
+- Cannot classify a recovering queue — a queue draining back to zero still triggers "count > threshold" alerts until it physically falls below the line
+- Cannot suppress false positives from burst arrivals on previously empty queues; a sudden producer spike looks identical to a consumer outage
+- No SLA wait-time estimation — the alert fires or does not; it does not tell the on-call engineer how many minutes until a breach
+
+### Baseline B — Naive Threshold-Only Custom Checker
+
+A slightly more sophisticated custom solution might check `ActiveCount > threshold` every minute and send a Teams message. This eliminates the Azure Monitor ingestion delay but still applies a single numeric guard.
+
+**What it provides over Baseline A:**
+- Near-real-time check via the Service Bus Admin API (same source as QBIS)
+- Customisable threshold and cadence without Azure Monitor dependency
+
+**What it still cannot do:**
+- Still fires the same alert for ConsumerStopped and ProducerSpike — both cause `ActiveCount` to grow; the remediation actions are entirely different (restart the consumer vs. scale producer capacity), yet the alert text is identical
+- DLQ growth on an idle queue remains invisible (ActiveCount = 0 → checker sees "healthy")
+- Recovering queues continue to fire alerts because count is still above threshold, even as the consumer is actively draining
+- A single OK reading (count falls below threshold for one cycle) clears the alert, even if the queue is oscillating; QBIS requires two consecutive OK readings before de-escalating (sticky severity rule, PR-3.1-01)
+- Alert flapping: without sticky severity, every oscillation above/below the threshold generates a new alert and a new clearance, producing noise that on-call engineers learn to ignore
+- No root cause text in the alert — the message says "queue is high" but not why
+
+### QBIS 9-Step Pipeline — What the Custom Logic Adds
+
+| Scenario | Azure Monitor | Threshold Checker | QBIS |
+|---|---|---|---|
+| ConsumerStopped vs ProducerSpike | Same alert for both | Same alert for both | Differentiates via outgoing-rate check: zero outgoing → ConsumerStopped; high incoming, normal outgoing → ProducerSpike |
+| Burst on empty queue | Fires Critical (2–4 min late) | Fires Critical immediately | Suppresses ConsumerStopped for 2 min via `queueWasRecentlyEmpty` guard (PR-2.2-01) |
+| DLQ growth, ActiveCount = 0 | No alert — count threshold not breached | No alert — count threshold not breached | Fires DLQGrowth alert regardless of ActiveCount |
+| Recovering queue (actively draining) | Continues alerting until count falls below threshold | Continues alerting until count falls below threshold | Classifies as Recovering, downgrades severity, suppresses re-alert |
+| Alert flapping (oscillating count) | Fires and clears on every cycle | Fires and clears on every cycle | Requires 2 consecutive OK readings before de-escalating (sticky severity) |
+| SLA breach risk | No estimation | No estimation | Computes `WaitTimeMinutes` from outgoing rate; shows time to breach on dashboard |
+| Root cause for on-call engineer | None | None | Root cause label (ConsumerStopped, ProducerSpike, DLQGrowth, Recovering, etc.) in alert and dashboard |
+| Azure Monitor rate data unavailable | Alert still fires on count | n/a (does not use Monitor) | Falls back to count-only logic; never fires Critical for Unknown root cause (PR-2.2-02) |
+| ConsumerSlowdown (rate declining, not stopped) | Fires only if count exceeds threshold | Fires only if count exceeds threshold | Detects early via outgoing-rate deceleration before threshold breach |
+
+The 9-step pipeline addresses each gap in the table above. The design trade-off is implementation complexity: the pipeline requires maintaining a rolling snapshot history, computing smoothed rate averages, and encoding priority-ordered root-cause logic. That complexity is the cost; the benefit is that on-call engineers receive a root cause label and an estimated breach window instead of a generic "count is high" notification.
 
 ---
 
