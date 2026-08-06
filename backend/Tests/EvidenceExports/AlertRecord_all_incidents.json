@@ -1,0 +1,99 @@
+{
+  "table": "AlertRecord",
+  "description": "All 7 alert incidents in the AlertRecord table for qbi-queue. Each row represents one incident lifecycle: OpenedAtUtc when first alert fired, ResolvedAtUtc when 2 consecutive OK readings de-escalated severity (sticky severity rule FR-3.1.1/PR-3.1-01), AlertCount showing how many reminder alerts fired during the incident, PeakSeverity showing the worst severity reached. Confirms FR-3.1.1 deduplication (AlertCount > 1 means reminders sent, not duplicate open alerts) and incident lifecycle tracking (FR-5.3.1).",
+  "queue": "qbi-queue",
+  "exported_utc": "2026-08-06",
+  "row_count": 7,
+  "rows": [
+    {
+      "AlertCount": 2,
+      "FirstRootCause": "Unknown",
+      "IncidentId": "09adabab-a992-443e-bfc3-7f144860f937",
+      "LastAlertSentUtc": "2026-07-13T18:40:46.280341+00:00",
+      "OpenedAtUtc": "2026-07-13T18:39:46.289569+00:00",
+      "PartitionKey": "qbi-queue",
+      "PeakSeverity": "Warning",
+      "ResolvedAtUtc": "2026-07-13T18:40:46.280341+00:00",
+      "RowKey": "09adabab-a992-443e-bfc3-7f144860f937",
+      "Status": "Resolved",
+      "Timestamp": "2026-07-13T18:40:46.414922+00:00"
+    },
+    {
+      "AlertCount": 4,
+      "FirstRootCause": "Unknown",
+      "IncidentId": "2a39c209-aca4-451e-ae47-7e4753e86289",
+      "LastAlertSentUtc": "2026-07-13T18:31:46.659867+00:00",
+      "OpenedAtUtc": "2026-07-13T18:06:46.438986+00:00",
+      "PartitionKey": "qbi-queue",
+      "PeakSeverity": "Critical",
+      "ResolvedAtUtc": "2026-07-13T18:31:46.659867+00:00",
+      "RowKey": "2a39c209-aca4-451e-ae47-7e4753e86289",
+      "Status": "Resolved",
+      "Timestamp": "2026-07-13T18:31:46.799060+00:00"
+    },
+    {
+      "AlertCount": 2,
+      "FirstRootCause": "Unknown",
+      "IncidentId": "31098d8f-9aac-4a37-8bc4-0d9c977451e2",
+      "LastAlertSentUtc": "2026-07-23T00:24:46.310802+00:00",
+      "OpenedAtUtc": "2026-07-23T00:23:46.452967+00:00",
+      "PartitionKey": "qbi-queue",
+      "PeakSeverity": "Critical",
+      "RowKey": "31098d8f-9aac-4a37-8bc4-0d9c977451e2",
+      "Status": "Open",
+      "Timestamp": "2026-07-23T00:24:46.361961+00:00"
+    },
+    {
+      "AlertCount": 3,
+      "FirstRootCause": "Unknown",
+      "IncidentId": "ae8fd755-d6c2-40ae-800f-b0d982861a15",
+      "LastAlertSentUtc": "2026-07-16T21:14:46.304451+00:00",
+      "OpenedAtUtc": "2026-07-16T20:28:46.260276+00:00",
+      "PartitionKey": "qbi-queue",
+      "PeakSeverity": "Critical",
+      "ResolvedAtUtc": "2026-07-16T21:14:46.304451+00:00",
+      "RowKey": "ae8fd755-d6c2-40ae-800f-b0d982861a15",
+      "Status": "Resolved",
+      "Timestamp": "2026-07-16T21:14:46.422879+00:00"
+    },
+    {
+      "AlertCount": 3,
+      "FirstRootCause": "Unknown",
+      "IncidentId": "b280a391-eb88-4856-a3c4-388f04134610",
+      "LastAlertSentUtc": "2026-07-16T20:27:46.320844+00:00",
+      "OpenedAtUtc": "2026-07-16T20:15:47.521444+00:00",
+      "PartitionKey": "qbi-queue",
+      "PeakSeverity": "Critical",
+      "ResolvedAtUtc": "2026-07-16T20:27:46.320844+00:00",
+      "RowKey": "b280a391-eb88-4856-a3c4-388f04134610",
+      "Status": "Resolved",
+      "Timestamp": "2026-07-16T20:27:46.404351+00:00"
+    },
+    {
+      "AlertCount": 5,
+      "FirstRootCause": "Unknown",
+      "IncidentId": "bb3fa4ef-fb8d-41fc-836b-0a237f1c9175",
+      "LastAlertSentUtc": "2026-07-23T00:19:46.699372+00:00",
+      "OpenedAtUtc": "2026-07-16T22:25:46.693296+00:00",
+      "PartitionKey": "qbi-queue",
+      "PeakSeverity": "Critical",
+      "ResolvedAtUtc": "2026-07-23T00:19:46.699372+00:00",
+      "RowKey": "bb3fa4ef-fb8d-41fc-836b-0a237f1c9175",
+      "Status": "Resolved",
+      "Timestamp": "2026-07-23T00:19:46.740224+00:00"
+    },
+    {
+      "AlertCount": 2,
+      "FirstRootCause": "Unknown",
+      "IncidentId": "d4de0f7f-686a-4a35-b0d4-7eb7d112f9d4",
+      "LastAlertSentUtc": "2026-07-16T21:59:46.240557+00:00",
+      "OpenedAtUtc": "2026-07-16T21:56:46.420622+00:00",
+      "PartitionKey": "qbi-queue",
+      "PeakSeverity": "Critical",
+      "ResolvedAtUtc": "2026-07-16T21:59:46.240557+00:00",
+      "RowKey": "d4de0f7f-686a-4a35-b0d4-7eb7d112f9d4",
+      "Status": "Resolved",
+      "Timestamp": "2026-07-16T21:59:46.349441+00:00"
+    }
+  ]
+}

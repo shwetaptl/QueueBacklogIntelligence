@@ -1,0 +1,47 @@
+{
+  "scenario": "TC-05 Recovery \u2014 ConsumerStopped \u2192 Recovering \u2192 Healthy",
+  "description": "Time-series showing full recovery lifecycle. Queue moves from ConsumerStopped (ActiveCount=52, Critical/BREACHING) through Recovering (Acceleration negative, GapPerMin negative) to Healthy (ActiveCount=0, None/OK). Confirms FR-2.2.1 Recovering classification and FR-3.1.1 sticky-severity de-escalation requiring 2 consecutive OK readings before alert clears.",
+  "queue": "qbi-queue",
+  "captured_utc": "2026-07-24T21:30/21:37",
+  "row_count": 2,
+  "rows": [
+    {
+      "Acceleration": -51.99,
+      "ActiveCount": 0,
+      "AlertSeverity": "Warning",
+      "DLQCount": 0,
+      "GapPerMin": -26.0,
+      "IncomingPerMin": 0.0,
+      "NeedToSendAlert": false,
+      "OutgoingPerMin": 0.0,
+      "PartitionKey": "qbi-queue",
+      "RootCause": "Recovering",
+      "RowKey": "2516173720495049949",
+      "SlaMinutes": 3,
+      "SlaStatus": "OK",
+      "Timestamp": "2026-07-24T21:32:30.621375+00:00",
+      "TimestampUtc": "2026-07-24T21:32:30.495005+00:00",
+      "TrendLabel": "Idle",
+      "WaitTimeMinutes": 0.0
+    },
+    {
+      "Acceleration": 51.99,
+      "ActiveCount": 0,
+      "AlertSeverity": "Warning",
+      "DLQCount": 0,
+      "GapPerMin": -15.6,
+      "IncomingPerMin": 0.0,
+      "NeedToSendAlert": false,
+      "OutgoingPerMin": 0.0,
+      "PartitionKey": "qbi-queue",
+      "RootCause": "Healthy",
+      "RowKey": "2516173719895850259",
+      "SlaMinutes": 3,
+      "SlaStatus": "OK",
+      "Timestamp": "2026-07-24T21:33:30.545008+00:00",
+      "TimestampUtc": "2026-07-24T21:33:30.414974+00:00",
+      "TrendLabel": "Idle",
+      "WaitTimeMinutes": 0.0
+    }
+  ]
+}
