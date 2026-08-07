@@ -40,7 +40,7 @@ Queue Backlog Intelligence (QBIS) is a serverless monitoring system built on Azu
 
                               │
                          React Frontend
-                         (nginx + Vite)
+                         (React 18 + Vite)
 ```
 
 ---
@@ -155,9 +155,73 @@ All data fetches use the custom `useFetch(url, intervalMs)` hook which:
 - Clears stale data when URL changes (time range switch)
 - Exposes `{ data, loading, error, fetchedAt, refetch }`
 
-### nginx proxy
+### API base URL
 
-The React app calls `/api/...` — nginx forwards to the Azure Functions container on port 80. No hardcoded backend URL in the frontend bundle.
+In local/Docker mode the React app calls `/api/...` and nginx forwards to the Functions container. In Azure deployment the app calls the Function App URL directly — `VITE_API_URL` is baked into the bundle at build time via the Vite environment variable.
+
+---
+
+## Deployment Modes
+
+QBIS supports two distinct deployment paths. The codebase is identical in both; only the hosting layer differs.
+
+### Mode 1 — Local development and self-hosted (Docker Compose)
+
+```
+Browser
+  │
+  ▼
+nginx container (port 80/443)
+  ├── /* → frontend container (React SPA, served by nginx)
+  └── /api/* → backend container (Azure Functions, port 7071)
+        │
+        ▼
+  Azure Table Storage (remote)
+  Azure Service Bus (remote)
+```
+
+| Component | How it runs |
+|---|---|
+| Frontend | `frontend/Dockerfile` — Node builds `dist/`, nginx serves static files |
+| Backend | `backend/Dockerfile` — .NET publishes, Functions host starts on 7071 |
+| Reverse proxy | `frontend/nginx.conf` — forwards `/api/*` to backend container |
+| Orchestration | `docker-compose.yml` (production) / `docker-compose.dev.yml` (hot reload) |
+| Start command | `./start.sh` |
+
+API URL in frontend: `/api/...` (relative — nginx handles routing, no hardcoded host).
+
+### Mode 2 — Azure (live production deployment)
+
+```
+Browser
+  │
+  ▼
+Azure Static Web App (CDN, HTTPS, global edge)
+  │  serves React SPA (static files from dist/)
+  │  VITE_API_URL points to Function App
+  │
+  ▼
+Azure Function App (Consumption plan, .NET 8 isolated)
+  │  CollectorFunction / AnalyzerFunction / AlertDispatcher / Cleanup / Dashboard
+  │  protected by Azure AD Easy Auth
+  │
+  ▼
+Azure Table Storage ── Azure Service Bus ── Azure Monitor API
+```
+
+| Component | How it runs |
+|---|---|
+| Frontend | `npm run build` → `dist/` deployed to Azure Static Web App via SWA CLI |
+| Backend | `func azure functionapp publish` → source deployed to Azure Function App |
+| Reverse proxy | None — Static Web App calls Function App URL directly via `VITE_API_URL` |
+| SSL/TLS | Azure platform — no nginx needed |
+| Docker | Not used — neither Dockerfile is involved in the Azure deployment path |
+
+API URL in frontend: `https://qbi-function-app-ardvf6ffahaucwc0.centralus-01.azurewebsites.net/api` (absolute, set in `frontend/.env.production`).
+
+### What changed and why
+
+The original design used Docker + nginx as a self-contained portable stack that could run on any VM or local machine. When deployed to Azure, the platform provides the equivalent capabilities natively — Static Web Apps replaces nginx + frontend container, and the Functions runtime replaces the backend container. Docker is retained for local development and as a self-hosted fallback but is not part of the Azure deployment pipeline.
 
 ---
 
