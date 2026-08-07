@@ -58,7 +58,7 @@ Returns all monitored queues with their current status.
     "slaMinutes": 3,
     "activeCount": 42,
     "waitTimeMinutes": 1.4,
-    "slaStatus": "Warning",
+    "slaStatus": "BREACHING",
     "trendLabel": "Growing",
     "rootCause": "ConsumerSlowdown",
     "alertSeverity": "Warning",
@@ -94,7 +94,7 @@ Same shape as a single item from `GET /api/queues`.
 |---|---|---|
 | `activeCount` | int | Current messages in queue |
 | `waitTimeMinutes` | double | Estimated wait: `activeCount / outgoingPerMin` |
-| `slaStatus` | string | `OK` / `AT_RISK` / `BREACHING` |
+| `slaStatus` | string | `OK` / `BREACHING` / `UNKNOWN` |
 | `trendLabel` | string | `Idle` / `Growing` / `GrowingFast` / `Draining` / `DrainingFast` / `Stable` |
 | `rootCause` | string | See root cause values below |
 | `alertSeverity` | string | `None` / `Warning` / `Critical` |
