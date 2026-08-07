@@ -9,7 +9,7 @@ function SignOutButton() {
   const { instance } = useMsal()
   return (
     <button
-      onClick={() => instance.logoutRedirect()}
+      onClick={() => instance.logoutRedirect({ onRedirectNavigate: () => false })}
       className="w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
     >
       Sign out
