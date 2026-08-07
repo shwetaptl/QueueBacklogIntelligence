@@ -14,8 +14,8 @@
 | **Branch**          | main                                                                   |
 | **Commit SHA**      | dda88ab (v1.4.1)                                                       |
 | **Release Version** | v1.4.1                                                                 |
-| **Document Version**| v1.3                                                                   |
-| **Last Updated**    | 2026-07-28                                                             |
+| **Document Version**| v1.4                                                                   |
+| **Last Updated**    | 2026-08-06                                                             |
 
 ---
 
@@ -27,6 +27,7 @@
 | v1.1    | 2026-07-22 | 4e46edb    | Fixed three factual errors: (A) storage table count 3→4 (QueueConfig added); (B) Traceability Matrix FR IDs realigned to PRD v1.2 exactly; (C) Collector cadence corrected from "every 30 seconds" to "every 60 seconds". | Shweta Patel  |
 | v1.2    | 2026-07-22 | —          | Added TC-11 through TC-16 (curl-based API scenarios for FR-4.x.x and FR-5.x.x); updated Traceability Matrix, Coverage Analysis, and Open Issues accordingly. | Shweta Patel  |
 | v1.3    | 2026-07-28 | —          | Added Section 17 Risk-Mitigation Matrix mapping R1–R8 to PRD UE IDs, mitigating FRs, and test scenarios; renumbered Sections 17–22 accordingly. | Shweta Patel  |
+| v1.4    | 2026-08-06 | —          | Added OI-07: correction of Midpoint Review Section 3.4 AlertCount claim; documents correct interpretation of AlertCount, FirstRootCause=Unknown cold-start behaviour, and actual incident count from machine-readable export. | Shweta Patel  |
 
 ---
 
@@ -813,6 +814,7 @@ Each JSON artifact captures up to 20 rows from `QueueSnapshot`, `QueueStatus`, a
 | OI-04 | `ConsumerSlowdown` and `ProducerSpikeAndConsumerSlowdown` root causes have no test scenarios — behavior is untested | Medium |
 | OI-05 | CleanupFunction has no manual test scenario — verification requires a 24-hour real-time wait or a dedicated short-TTL test environment | Low |
 | OI-06 | TC-11 through TC-16 (API scenarios) have not yet been executed — dedicated first runs needed to produce PASS/FAIL records in `TestResults/` | Medium |
+| OI-07 | **AlertRecord field interpretation correction.** The Midpoint Review document (Section 3.4) claimed "AlertCount=1 across all 5 incidents confirms deduplication." The machine-readable export (`backend/Tests/EvidenceExports/AlertRecord_all_incidents.json`) shows AlertCount values of 2, 3, 4, and 5 — and 7 incidents, not 5. The Midpoint claim was incorrect on both counts. The correct interpretation: AlertCount is the total dispatches per incident (initial alert + cooldown-window reminders); AlertCount > 1 is normal for incidents that remain open across multiple analyzer cycles. Deduplication is evidenced by the fact that 7 rows cover the entire recorded history of the queue — the system never opened a duplicate incident row while one was already active. The `FirstRootCause = Unknown` on all rows reflects cold-start behavior: the alert opens within the first 1–2 cycles before the pipeline has accumulated enough snapshot history to produce a named classification. The QueueStatus table (same sessions) shows named root causes (ConsumerStopped, DLQGrowth) appearing in subsequent rows. | High |
 
 ---
 
