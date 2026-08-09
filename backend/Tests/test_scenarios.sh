@@ -297,6 +297,33 @@ save_snapshot() {
     echo -e "${GREEN}  → Saved: $(basename "${prefix}")_*.json${NC}"
 }
 
+# Usage: save_api_evidence TC11 "response"  [optional: also_save_config]
+# Saves the last API response body and, if requested, the current QueueConfig table.
+save_api_evidence() {
+    local tc=$1       # e.g. TC11
+    local label=$2    # e.g. response
+    local ts
+    ts=$(date +%H%M%S)
+    local prefix="${RESULTS_DIR}/${tc}_${ts}_${label}"
+
+    # Save last API response (captured by curl -o /tmp/qbis_api_resp.json)
+    if [ -f /tmp/qbis_api_resp.json ]; then
+        cp /tmp/qbis_api_resp.json "${prefix}_api_response.json"
+        echo -e "${CYAN}  → Saved API response: $(basename "${prefix}")_api_response.json${NC}"
+    fi
+
+    # Optionally save the QueueConfig table state
+    if [ "${3:-}" = "also_save_config" ]; then
+        az storage entity query \
+          --account-name "$STORAGE_ACCOUNT" \
+          --table-name QueueConfig \
+          --filter "PartitionKey eq 'config'" \
+          --connection-string "$STORAGE_CONN" \
+          --output json > "${prefix}_queueconfig.json" 2>/dev/null
+        echo -e "${CYAN}  → Saved QueueConfig: $(basename "${prefix}")_queueconfig.json${NC}"
+    fi
+}
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # SCENARIOS
@@ -902,6 +929,7 @@ except Exception as e:
         local detail
         detail=$(echo "$FOUND" | cut -d: -f2)
         echo -e "${GREEN}${BOLD}✅ PASS — $QUEUE found in /api/queues response (slaStatus/alertSeverity: $detail)${NC}"
+        save_api_evidence "TC11" "get_queue_summaries"
     else
         echo -e "${RED}${BOLD}❌ FAIL — HTTP=$ACTUAL_STATUS  lookup=$FOUND${NC}"
     fi
@@ -938,6 +966,7 @@ except Exception as e:
     echo -e "Actual:   HTTP $ACTUAL_STATUS — $COUNT"
     if [ "$ACTUAL_STATUS" = "200" ]; then
         echo -e "${GREEN}${BOLD}✅ PASS — HTTP 200, history endpoint returned ($COUNT)${NC}"
+        save_api_evidence "TC12" "get_queue_history"
     else
         echo -e "${RED}${BOLD}❌ FAIL — HTTP=$ACTUAL_STATUS${NC}"
     fi
@@ -974,6 +1003,7 @@ except Exception as e:
     echo -e "Actual:   HTTP $ACTUAL_STATUS — $COUNT"
     if [ "$ACTUAL_STATUS" = "200" ]; then
         echo -e "${GREEN}${BOLD}✅ PASS — HTTP 200, alert history endpoint returned ($COUNT)${NC}"
+        save_api_evidence "TC13" "get_alert_history"
     else
         echo -e "${RED}${BOLD}❌ FAIL — HTTP=$ACTUAL_STATUS${NC}"
     fi
@@ -1052,6 +1082,7 @@ except:
     echo -e "Actual:   $ROW_EXISTS"
     if [[ "$ROW_EXISTS" == FOUND* ]]; then
         echo -e "${GREEN}${BOLD}✅ PASS — QueueConfig row created ($ROW_EXISTS)${NC}"
+        save_api_evidence "TC14" "post_create" "also_save_config"
     else
         echo -e "${RED}${BOLD}❌ FAIL — Row not found in QueueConfig table${NC}"
     fi
@@ -1177,6 +1208,7 @@ print(str(v.get('value', v) if isinstance(v, dict) else v))
     echo -e "Actual:   SlaMinutes=$UPDATED_SLA"
     if [ "$UPDATED_SLA" = "$NEW_SLA" ]; then
         echo -e "${GREEN}${BOLD}✅ PASS — SlaMinutes updated to $NEW_SLA in table${NC}"
+        save_api_evidence "TC15" "put_update" "also_save_config"
     else
         echo -e "${RED}${BOLD}❌ FAIL — SlaMinutes=$UPDATED_SLA (expected $NEW_SLA)${NC}"
     fi
@@ -1276,6 +1308,7 @@ except:
     echo -e "Actual:   $ROW_CHECK"
     if [ "$ROW_CHECK" = "GONE" ]; then
         echo -e "${GREEN}${BOLD}✅ PASS — Row deleted from QueueConfig table${NC}"
+        save_api_evidence "TC16" "delete_confirm" "also_save_config"
     else
         echo -e "${RED}${BOLD}❌ FAIL — $ROW_CHECK (row still present)${NC}"
     fi
