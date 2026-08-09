@@ -472,6 +472,7 @@ Each test run creates a timestamped directory under `backend/Tests/TestResults/Y
 | 2026-07-05 | `20260705_093715` | TC-07 (defect discovered) |
 | 2026-07-05 | `20260705_095729` | TC-06 (observational) |
 | 2026-07-13 | `20260713_111240` | TC-08 (two regression runs after v1.3.3 fix) |
+| 2026-08-09 | `20260809_095201` | TC-11, TC-12, TC-13, TC-14, TC-15, TC-16 |
 
 ---
 
@@ -520,6 +521,12 @@ The table below records every assertion outcome extracted from `terminal.log` fi
 | 2026-07-05 | 20260705_095729 | TC-06 | Observational | — | BREACHING during slow drain observed | Observational |
 | 2026-07-13 | 20260713_111240 | TC-08 | `verify_scenario` | Trend=Idle, SLA=OK, Sev=None, Cause=Healthy | Trend=Idle, SLA=OK, Sev=None, Cause=Healthy (Active=2) | **PASS** |
 | 2026-07-13 | 20260713_111240 | TC-08 | `verify_scenario` | Trend=Idle, SLA=OK, Sev=None, Cause=Healthy | Trend=Idle, SLA=OK, Sev=None, Cause=Healthy (Active=2) | **PASS** |
+| 2026-08-09 | 20260809_095201 | TC-11 | `scenario_11` | HTTP 200, queueName=qbi-queue in array | HTTP 200 — FOUND:OK/None (slaStatus=OK, alertSeverity=None) | **PASS** |
+| 2026-08-09 | 20260809_095201 | TC-12 | `scenario_12` | HTTP 200, JSON array of history rows | HTTP 200 — 30 rows returned | **PASS** |
+| 2026-08-09 | 20260809_095201 | TC-13 | `scenario_13` | HTTP 200, JSON array of alert history | HTTP 200 — 7 alerts returned | **PASS** |
+| 2026-08-09 | 20260809_095201 | TC-14 | `scenario_14` | POST HTTP 200, row exists with SlaMinutes=10, cleanup DELETE HTTP 200 | HTTP 200 create; FOUND:SlaMinutes=10; cleanup HTTP 200 | **PASS** |
+| 2026-08-09 | 20260809_095201 | TC-15 | `scenario_15` | PUT HTTP 200, SlaMinutes=99 in table, restored to 3 | HTTP 200; SlaMinutes=99 confirmed; restore HTTP 200 | **PASS** |
+| 2026-08-09 | 20260809_095201 | TC-16 | `scenario_16` | POST setup HTTP 200, DELETE HTTP 200, row absent | HTTP 200 create; HTTP 200 delete; GONE confirmed | **PASS** |
 
 ---
 
@@ -537,12 +544,18 @@ The table below records every assertion outcome extracted from `terminal.log` fi
 | TC-08 | Idle Queue with Stale Messages | 3 total (1 fail + 2 pass) | **PASS** (post-fix) | SEVERITY-BUG-01 discovered on first run; fixed in v1.3.3; two passing regression runs captured |
 | TC-09 | Burst Arrival on Empty Queue | 0 (assertion added in v1.1.1) | — | `verify_not_consumer_stopped` assertion added; no dedicated run in TestResults |
 | TC-10 | Full Lifecycle | 0 (assertion added in v1.1.1) | — | `verify_scenario` assertion added in v1.1.1; no dedicated run captured in TestResults |
+| TC-11 | GET Queue Summaries | 1 | **PASS** | HTTP 200; qbi-queue present with slaStatus=OK, alertSeverity=None |
+| TC-12 | GET Queue History | 1 | **PASS** | HTTP 200; 30 history rows returned |
+| TC-13 | GET Alert History | 1 | **PASS** | HTTP 200; 7 alert records returned |
+| TC-14 | Create Queue Configuration | 1 | **PASS** | Queue created (SlaMinutes=10 confirmed in table); cleanup DELETE succeeded |
+| TC-15 | Update Queue Configuration | 1 | **PASS** | SlaMinutes updated to 99 and restored; both PUTs HTTP 200 |
+| TC-16 | Delete Queue Configuration | 1 | **PASS** | Temp queue created via POST, deleted via DELETE; row confirmed absent |
 
 **Totals (assertion runs only):**
 
 | Outcome | Count |
 |---------|-------|
-| PASS | 6 |
+| PASS | 12 |
 | FAIL (before fix) | 2 |
 | Observational (no assertion) | 2 |
 | Not yet executed with assertion | 2 |
@@ -813,7 +826,7 @@ Each JSON artifact captures up to 20 rows from `QueueSnapshot`, `QueueStatus`, a
 | OI-03 | TC-09 and TC-10 assertion added in v1.1.1 but no TestResults run exists — dedicated execution needed | Medium |
 | OI-04 | `ConsumerSlowdown` and `ProducerSpikeAndConsumerSlowdown` root causes have no test scenarios — behavior is untested | Medium |
 | OI-05 | CleanupFunction has no manual test scenario — verification requires a 24-hour real-time wait or a dedicated short-TTL test environment | Low |
-| OI-06 | TC-11 through TC-16 (API scenarios) have not yet been executed — dedicated first runs needed to produce PASS/FAIL records in `TestResults/` | Medium |
+| OI-06 | ~~TC-11 through TC-16 (API scenarios) have not yet been executed~~ — **Closed 2026-08-09**: all six API scenarios executed in run `20260809_095201`; all six PASS | ~~Medium~~ **Closed** |
 | OI-07 | **AlertRecord field interpretation correction.** The Midpoint Review document (Section 3.4) claimed "AlertCount=1 across all 5 incidents confirms deduplication." The machine-readable export (`backend/Tests/EvidenceExports/AlertRecord_all_incidents.json`) shows AlertCount values of 2, 3, 4, and 5 — and 7 incidents, not 5. The Midpoint claim was incorrect on both counts. The correct interpretation: AlertCount is the total dispatches per incident (initial alert + cooldown-window reminders); AlertCount > 1 is normal for incidents that remain open across multiple analyzer cycles. Deduplication is evidenced by the fact that 7 rows cover the entire recorded history of the queue — the system never opened a duplicate incident row while one was already active. The `FirstRootCause = Unknown` on all rows reflects cold-start behavior: the alert opens within the first 1–2 cycles before the pipeline has accumulated enough snapshot history to produce a named classification. The QueueStatus table (same sessions) shows named root causes (ConsumerStopped, DLQGrowth) appearing in subsequent rows. | High |
 
 ---

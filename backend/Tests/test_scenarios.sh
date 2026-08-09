@@ -998,17 +998,17 @@ scenario_14_create_queue_config() {
     # Build request body
     cat > /tmp/qbis_tc14_body.json << JSONEOF
 {
-    "QueueName": "$TEST_QUEUE",
-    "Namespace": "$NAMESPACE",
-    "SubscriptionId": "$SUB_ID",
-    "ResourceGroupName": "$RESOURCE_GROUP",
-    "SlaMinutes": 10,
-    "IsEnabled": false,
-    "CooldownMinutes": 5,
-    "WarningThreshold": 0.7,
-    "CriticalThreshold": 1.0,
-    "TeamsWebhookUrl": null,
-    "EmailRecipients": null
+    "queueName": "$TEST_QUEUE",
+    "namespace": "$NAMESPACE",
+    "subscriptionId": "$SUB_ID",
+    "resourceGroupName": "$RESOURCE_GROUP",
+    "slaMinutes": 10,
+    "isEnabled": false,
+    "cooldownMinutes": 5,
+    "warningThreshold": 0.7,
+    "criticalThreshold": 1.0,
+    "teamsWebhookUrl": null,
+    "emailRecipients": null
 }
 JSONEOF
 
@@ -1114,17 +1114,17 @@ import sys
 new_sla = int(sys.argv[1])
 
 body = {
-    'QueueName':         get_val(entity, 'QueueName'),
-    'Namespace':         get_val(entity, 'Namespace'),
-    'SubscriptionId':    get_val(entity, 'SubscriptionId'),
-    'ResourceGroupName': get_val(entity, 'ResourceGroupName'),
-    'SlaMinutes':        new_sla,
-    'IsEnabled':         bool(get_val(entity, 'IsEnabled', True)),
-    'CooldownMinutes':   int(get_val(entity, 'CooldownMinutes', 5)),
-    'WarningThreshold':  float(get_val(entity, 'WarningThreshold', 0.7)),
-    'CriticalThreshold': float(get_val(entity, 'CriticalThreshold', 1.0)),
-    'TeamsWebhookUrl':   get_val(entity, 'TeamsWebhookUrl') or None,
-    'EmailRecipients':   get_val(entity, 'EmailRecipients') or None,
+    'queueName':         get_val(entity, 'QueueName'),
+    'namespace':         get_val(entity, 'Namespace'),
+    'subscriptionId':    get_val(entity, 'SubscriptionId'),
+    'resourceGroupName': get_val(entity, 'ResourceGroupName'),
+    'slaMinutes':        new_sla,
+    'isEnabled':         bool(get_val(entity, 'IsEnabled', True)),
+    'cooldownMinutes':   int(get_val(entity, 'CooldownMinutes', 5)),
+    'warningThreshold':  float(get_val(entity, 'WarningThreshold', 0.7)),
+    'criticalThreshold': float(get_val(entity, 'CriticalThreshold', 1.0)),
+    'teamsWebhookUrl':   get_val(entity, 'TeamsWebhookUrl') or None,
+    'emailRecipients':   get_val(entity, 'EmailRecipients') or None,
 }
 print(json.dumps(body))
 PYEOF
@@ -1216,17 +1216,17 @@ scenario_16_delete_queue_config() {
     echo -e "${BOLD}─── SETUP: Create $TEST_QUEUE ───${NC}"
     cat > /tmp/qbis_tc16_body.json << JSONEOF
 {
-    "QueueName": "$TEST_QUEUE",
-    "Namespace": "$NAMESPACE",
-    "SubscriptionId": "$SUB_ID",
-    "ResourceGroupName": "$RESOURCE_GROUP",
-    "SlaMinutes": 5,
-    "IsEnabled": false,
-    "CooldownMinutes": 5,
-    "WarningThreshold": 0.7,
-    "CriticalThreshold": 1.0,
-    "TeamsWebhookUrl": null,
-    "EmailRecipients": null
+    "queueName": "$TEST_QUEUE",
+    "namespace": "$NAMESPACE",
+    "subscriptionId": "$SUB_ID",
+    "resourceGroupName": "$RESOURCE_GROUP",
+    "slaMinutes": 5,
+    "isEnabled": false,
+    "cooldownMinutes": 5,
+    "warningThreshold": 0.7,
+    "criticalThreshold": 1.0,
+    "teamsWebhookUrl": null,
+    "emailRecipients": null
 }
 JSONEOF
 

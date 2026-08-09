@@ -60,7 +60,8 @@ namespace QueueBacklogIntelligence.Functions
 
         private static readonly JsonSerializerOptions _json = new()
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNamingPolicy        = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true,
         };
 
         public DashboardFunction(IRepository repository, ILogger<DashboardFunction> logger)
