@@ -1311,7 +1311,7 @@ while true; do
     echo -e "  ${RED}[3]${NC}  TC-03: Growing Backlog                     (Warning → Critical progression)"
     echo -e "  ${GREEN}[4]${NC}  TC-04: Stable Balanced Queue              (no false alarms)"
     echo -e "  ${RED}[5]${NC}  TC-05: Consumer Stops Mid-Operation        (state transition captured)"
-    echo -e "  ${CYAN}[6]${NC}  TC-05: Auto Recovery After Fix            (alert clears itself)"
+    echo -e "  ${CYAN}[6]${NC}  TC-05b: Auto Recovery After Fix           (alert clears itself)"
     echo -e "  ${YELLOW}[7]${NC}  TC-06: Slow Drain While Breaching SLA    (BREACHING sustained)"
     echo -e "  ${YELLOW}[8]${NC}  TC-07: DLQ Growth                         (DLQ root cause)"
     echo -e "  ${GREEN}[9]${NC}  TC-08: Idle Queue with Stale Messages     (no false Critical)"
